@@ -1,0 +1,36 @@
+name: "EddieBot"
+
+services:
+  supervisor:
+    build: ./analyzer
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+    depends_on:
+      - redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+    networks:
+      - eddie_network
+
+
+  redis:
+    image: redis/redis-stack:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    volumes:
+      - redis_data:/data
+    networks:
+      - eddie_network
+
+volumes:
+  redis_data:
+
+networks:
+  eddie_network:

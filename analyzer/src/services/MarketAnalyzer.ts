@@ -1,12 +1,21 @@
 // services/MarketAnalyzer.ts
 import { WebSocket } from 'ws';
 import { Redis } from 'ioredis';
-import {MarketEvent, BinanceKline, MarketAnalysis, IntervalVariations, IntervalVolumes} from '@/types/market';
+import {
+    MarketEvent,
+    BinanceKline,
+    MarketAnalysis,
+    IntervalVariations,
+    IntervalVolumes,
+    IntervalVariationsBySeconds
+} from '@/types/market';
 import {PriceVariationTracker} from "../services";
+import {PriceVariationTrackerBySeconds} from "../services";
 import { VolumeTracker } from '../services';
 
 export class MarketAnalyzer {
     private priceTracker: PriceVariationTracker;
+    private priceTrackerByS: PriceVariationTrackerBySeconds;
 
     private volumeTracker: VolumeTracker;
 
@@ -26,13 +35,14 @@ export class MarketAnalyzer {
     private analysisWindows: Map<string, MarketAnalysis[]>;
     private readonly WINDOW_SIZE = 100; // Number of data points to keep
     private readonly VOLUME_THRESHOLD = 2; // Volume multiplier for mass events
-    private readonly PRICE_VARIANCE_THRESHOLD = 0.02; // 2% price change threshold
+    private readonly PRICE_VARIANCE_THRESHOLD = 0.035; // 3.5% price change threshold
 
     constructor(redisUrl: string) {
         this.redis = new Redis(redisUrl);
         this.analysisWindows = new Map();
         this.initializeWebSocket();
         this.priceTracker = new PriceVariationTracker();
+        this.priceTrackerByS = new PriceVariationTrackerBySeconds();
         this.volumeTracker = new VolumeTracker();
     }
 
@@ -42,7 +52,7 @@ export class MarketAnalyzer {
         this.ws.on('open', () => {
             // Subscribe to multiple symbols
             const symbols = ['btcusdt'];
-            const intervals = ['1m'];
+            const intervals = ['1s'];
 
             const subscriptions = symbols.flatMap(symbol =>
                 intervals.map(interval => `${symbol}@kline_${interval}`)
@@ -95,6 +105,41 @@ export class MarketAnalyzer {
         }
     }
 
+    private async checkPriceVariationsBySeconds(symbol: string, variations: IntervalVariationsBySeconds) {
+        const VARIATION_THRESHOLDS = {
+            '1s': 1,   // 0.1% in 1s
+            '2s': 2,  // 0.2% in 2s
+            '3s': 3,  // 0.3% in 3s
+            '4s': 3.5,  // 0.35% in 4s
+            '5s': 4,  // 0.4% in 5s
+            '6s': 45,  // 0.45% in 6s
+            '7s': 5,  // 0.5% in 7s
+            '8s': 5.5,  // 0.5% in 8s
+            '9s': 6, // 0.5% in 9s
+            '10s': 6.5,  // 0.5% in 10s
+        };
+
+        for (const [interval, variation] of Object.entries(variations)) {
+            const threshold = VARIATION_THRESHOLDS[interval as keyof typeof VARIATION_THRESHOLDS];
+
+            if (Math.abs(variation.variation) >= threshold) {
+                await this.publishEvent({
+                    type: variation.variation > 0 ? 'PRICE_JUMP_SECOND' : 'PRICE_DROP_SECOND',
+                    symbol,
+                    price: variation.currentPrice,
+                    volume: 0, // You might want to calculate volume for the interval
+                    timestamp: variation.timestamp,
+                    percentage: variation.variation,
+                    timeFrame: interval,
+                    additionalData: {
+                        startPrice: variation.startPrice,
+                        threshold
+                    }
+                });
+            }
+        }
+    }
+
     // Add method to get current variations
     public async getSymbolVariations(symbol: string): Promise<IntervalVariations | undefined> {
         return this.priceTracker.getVariations(symbol);
@@ -113,6 +158,8 @@ export class MarketAnalyzer {
             volume: parseFloat(kline.v),
             timestamp: kline.t
         };
+
+
 
         this.publishEvent({
             type: 'PRICE_UPDATE',
@@ -145,6 +192,12 @@ export class MarketAnalyzer {
         // Check for significant variations
         await this.checkPriceVariations(symbol, variations as IntervalVariations);
 
+        // Track price variations
+        const variationsS = this.priceTrackerByS.trackPrice(symbol, analysis.price, analysis.timestamp);
+
+        // Check for significant variations
+        await this.checkPriceVariationsBySeconds(symbol, variationsS as IntervalVariationsBySeconds);
+
         // Update sliding window
         currentWindow.push(analysis);
         if (currentWindow.length > this.WINDOW_SIZE) {
@@ -166,42 +219,42 @@ export class MarketAnalyzer {
             const threshold = this.VOLUME_THRESHOLDS[interval as keyof typeof this.VOLUME_THRESHOLDS];
 
             // Check for mass buying
-            if (volumeData.totalVolume >= threshold.volume &&
-                volumeData.buyPressure >= threshold.pressure) {
-                await this.publishEvent({
-                    type: 'MASS_BUY',
-                    symbol,
-                    price: 0, // You'll need to pass current price here
-                    volume: volumeData.totalVolume,
-                    timestamp: volumeData.timestamp,
-                    percentage: volumeData.buyPressure,
-                    timeFrame: interval,
-                    additionalData: {
-                        buyVolume: volumeData.buyVolume,
-                        sellVolume: volumeData.sellVolume,
-                        threshold: threshold.pressure
-                    }
-                });
-            }
-
-            // Check for mass selling
-            if (volumeData.totalVolume >= threshold.volume &&
-                volumeData.sellPressure >= threshold.pressure) {
-                await this.publishEvent({
-                    type: 'MASS_SELL',
-                    symbol,
-                    price: 0, // You'll need to pass current price here
-                    volume: volumeData.totalVolume,
-                    timestamp: volumeData.timestamp,
-                    percentage: volumeData.sellPressure,
-                    timeFrame: interval,
-                    additionalData: {
-                        buyVolume: volumeData.buyVolume,
-                        sellVolume: volumeData.sellVolume,
-                        threshold: threshold.pressure
-                    }
-                });
-            }
+            // if (volumeData.totalVolume >= threshold.volume &&
+            //     volumeData.buyPressure >= threshold.pressure) {
+            //     await this.publishEvent({
+            //         type: 'MASS_BUY',
+            //         symbol,
+            //         price: 0, // You'll need to pass current price here
+            //         volume: volumeData.totalVolume,
+            //         timestamp: volumeData.timestamp,
+            //         percentage: volumeData.buyPressure,
+            //         timeFrame: interval,
+            //         additionalData: {
+            //             buyVolume: volumeData.buyVolume,
+            //             sellVolume: volumeData.sellVolume,
+            //             threshold: threshold.pressure
+            //         }
+            //     });
+            // }
+            //
+            // // Check for mass selling
+            // if (volumeData.totalVolume >= threshold.volume &&
+            //     volumeData.sellPressure >= threshold.pressure) {
+            //     await this.publishEvent({
+            //         type: 'MASS_SELL',
+            //         symbol,
+            //         price: 0, // You'll need to pass current price here
+            //         volume: volumeData.totalVolume,
+            //         timestamp: volumeData.timestamp,
+            //         percentage: volumeData.sellPressure,
+            //         timeFrame: interval,
+            //         additionalData: {
+            //             buyVolume: volumeData.buyVolume,
+            //             sellVolume: volumeData.sellVolume,
+            //             threshold: threshold.pressure
+            //         }
+            //     });
+            // }
         }
     }
 
@@ -216,7 +269,7 @@ export class MarketAnalyzer {
 
         // Detect mass buy
         if (
-            current.buyPressure > 0.7 && // 70% buy pressure
+            current.buyPressure > 0.85 && // 85% buy pressure
             current.volume > avgVolume * this.VOLUME_THRESHOLD
         ) {
             await this.publishEvent({

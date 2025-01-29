@@ -1,6 +1,6 @@
 // types/market.ts
 export interface MarketEvent {
-    type: 'MASS_BUY' | 'MASS_SELL' | 'PRICE_JUMP' | 'PRICE_DROP' | 'PRICE_UPDATE';
+    type: 'MASS_BUY' | 'MASS_SELL' | 'PRICE_JUMP' | 'PRICE_DROP' | 'PRICE_UPDATE' | 'PRICE_JUMP_SECOND' | 'PRICE_DROP_SECOND';
     symbol: string;
     price: number;
     volume: number;
@@ -55,6 +55,19 @@ export interface IntervalVariations {
     '25m': PriceVariation;
     '30m': PriceVariation;
     '60m': PriceVariation;
+}
+
+export interface IntervalVariationsBySeconds {
+    '1s': PriceVariation;
+    '2s': PriceVariation;
+    '3s': PriceVariation;
+    '4s': PriceVariation;
+    '5s': PriceVariation;
+    '6s': PriceVariation;
+    '7s': PriceVariation;
+    '8s': PriceVariation;
+    '9s': PriceVariation;
+    '10s': PriceVariation;
 }
 
 export interface VolumeData {

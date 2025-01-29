@@ -9,6 +9,6 @@ COPY . .
 RUN npm run build
 
 ENV NODE_ENV=production
-ENV REDIS_URL=redis://0.0.0.0:6379
+ENV REDIS_URL=redis://0.0.0.0:6179
 
 CMD ["npm", "start"]

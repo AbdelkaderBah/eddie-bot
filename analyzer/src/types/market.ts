@@ -1,6 +1,7 @@
 // types/market.ts
 export interface MarketEvent {
-    type: 'MASS_BUY' | 'MASS_SELL' | 'PRICE_JUMP' | 'PRICE_DROP' | 'PRICE_UPDATE' | 'PRICE_JUMP_SECOND' | 'PRICE_DROP_SECOND';
+    name: string;
+    type: 'PRICE_UPDATE' | 'VOLUME';
     symbol: string;
     price: number;
     volume: number;
@@ -11,7 +12,7 @@ export interface MarketEvent {
         startPrice?: number,
         buyVolume?: number,
         sellVolume?: number,
-        threshold: number
+        threshold?: number
     }
 }
 
@@ -28,6 +29,15 @@ export interface BinanceKline {
     q: string;      // Quote asset volume
     V: string;      // Taker buy base volume
     Q: string;      // Taker buy quote volume
+    x?: boolean;      // Is this kline closed?
+}
+
+export interface BriefKline {
+    high: number;
+    low: number;
+    close: number;
+    open: number;
+    volume: number;
 }
 
 export interface MarketAnalysis {

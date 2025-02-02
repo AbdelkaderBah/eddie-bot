@@ -1,0 +1,14 @@
+{
+  "name": "test-place",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Testing things for the analyzer",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "d3fc-technical-indicator": "^6.1.1",
+    "ws": "*"
+  }
+}

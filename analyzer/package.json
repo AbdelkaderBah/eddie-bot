@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@types/node": "^22.10.5",
+    "d3fc-technical-indicator": "^6.1.1",
     "ioredis": "^5.4.2",
     "path": "^0.12.7",
     "ws": "^8.18.0"

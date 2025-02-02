@@ -1,15 +1,15 @@
 // services/SupervisorService.ts
 import { Redis } from 'ioredis';
-import { MarketAnalyzer } from './MarketAnalyzer';
+import { MarketCollector } from './MarketCollector';
 import { MarketEvent } from '../types/market';
 
 export class SupervisorService {
     private redis: Redis;
-    private analyzer: MarketAnalyzer;
+    private analyzer: MarketCollector;
 
     constructor(redisUrl: string) {
         this.redis = new Redis(redisUrl);
-        this.analyzer = new MarketAnalyzer(redisUrl);
+        this.analyzer = new MarketCollector(redisUrl);
         this.initializeEventListener();
     }
 

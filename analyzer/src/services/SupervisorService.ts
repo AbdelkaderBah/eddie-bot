@@ -2,6 +2,8 @@
 import { Redis } from 'ioredis';
 import { MarketCollector } from './MarketCollector';
 import { MarketEvent } from '../types/market';
+import {Condition} from "../types/conditions";
+import ConditionMatch from "../utils/condition_match";
 
 export class SupervisorService {
     private redis: Redis;
@@ -27,23 +29,25 @@ export class SupervisorService {
     }
 
     private async processEvent(event: MarketEvent) {
-        try {
-            // Get all supervisors watching this symbol
-            const supervisors = await this.redis.hgetall('supervisors');
+        this.botActivation(event);
 
-            for (const [id, supervisorStr] of Object.entries(supervisors)) {
-                const supervisor = JSON.parse(supervisorStr);
-
-                if (!supervisor.active || !this.matchesConditions(event, supervisor)) {
-                    continue;
-                }
-
-                // Execute supervisor actions
-                await this.executeActions(supervisor, event);
-            }
-        } catch (error) {
-            console.error('Error processing event:', error);
-        }
+        // try {
+        //     // Get all supervisors watching this symbol
+        //     const supervisors = await this.redis.hgetall('supervisors');
+        //
+        //     for (const [id, supervisorStr] of Object.entries(supervisors)) {
+        //         const supervisor = JSON.parse(supervisorStr);
+        //
+        //         if (!supervisor.active || !this.matchesConditions(event, supervisor)) {
+        //             continue;
+        //         }
+        //
+        //         // Execute supervisor actions
+        //         await this.executeActions(supervisor, event);
+        //     }
+        // } catch (error) {
+        //     console.error('Error processing event:', error);
+        // }
     }
 
     private matchesConditions(event: MarketEvent, supervisor: any): boolean {
@@ -92,5 +96,62 @@ export class SupervisorService {
     public close() {
         this.analyzer.close();
         this.redis.disconnect();
+    }
+
+    private bots = [
+        {
+            id: 1,
+            name: 'Bot 1',
+            active: false,
+            conditions: [
+                {
+                    type: 'PRICE',
+                    percentage: -0.05,
+                    period: 28,
+                },
+                {
+                    type: 'VOLUME',
+                    side: 'BUY',
+                    percentage: 60,
+                    period: 14,
+                }
+            ] as Condition[]
+        }
+    ]
+
+    private async getLastPrices() {
+        const prices = await this.redis.zrange('events:BTCUSDT:prices', -100, -1);
+
+        return prices.map(price => JSON.parse(price));
+    }
+
+    private async getLastVolumes() {
+        const volumes = await this.redis.zrange('events:BTCUSDT:depths', -100, -1);
+
+        return volumes.map(volume => JSON.parse(volume));
+    }
+
+    private async botActivation(event: MarketEvent) {
+        const lastPrices = await this.getLastPrices();
+        const lastVolumes = await this.getLastVolumes();
+
+        this.bots.filter(bot => {
+            if(bot.active) return false;
+
+            const name = bot.name;
+            const conditions = bot.conditions;
+
+            const conditionsMet =  conditions.every((condition: Condition) => {
+                return (new ConditionMatch(condition, lastPrices, lastVolumes)).check();
+            });
+
+            if (conditionsMet) {
+                bot.active = true;
+
+                console.log(`Bot ${name} activated!`, {
+                    price: lastPrices[lastPrices.length - 1].price,
+                });
+            }
+        });
     }
 }

@@ -2,6 +2,7 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/compo
 import kline from "./kline";
 import BinanceChart from "./kline";
 import DepthChart from "./depth";
+import { RedisData } from './redis-data';
 
 export default async function DashboardPage() {
   return (
@@ -13,6 +14,7 @@ export default async function DashboardPage() {
         <CardContent>
             <BinanceChart />
             <DepthChart />
+            <RedisData />
         </CardContent>
       </Card>
   );

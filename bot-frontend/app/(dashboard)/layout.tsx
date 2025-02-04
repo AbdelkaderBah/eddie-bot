@@ -85,6 +85,10 @@ function DesktopNav() {
         <NavItem href="/insights" label="Insights">
           <LineChart className="h-5 w-5" />
         </NavItem>
+
+        <NavItem href="/monitor" label="Monitor">
+          <LineChart className="h-5 w-5" />
+        </NavItem>
       </nav>
       <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
         <Tooltip>

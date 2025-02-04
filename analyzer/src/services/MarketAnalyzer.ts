@@ -39,8 +39,6 @@ export class MarketAnalyzer {
             }
 
             this.analyzeTrend();
-
-            console.log('Processing event:', event.name);
         } catch (error) {
             console.error('Error processing event:', error);
         }

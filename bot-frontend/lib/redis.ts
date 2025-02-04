@@ -5,6 +5,8 @@ if (!process.env.REDIS_URL) {
     throw new Error('REDIS_URL is not defined in environment variables');
 }
 
+console.log('Connecting redis!')
+
 // Create Redis instance
 const redis = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: 3,
@@ -150,6 +152,10 @@ export const redisClient = {
 
     async deleteHash(hash: string, field: string) {
         return await redis.hdel(hash, field);
+    },
+
+    async zrange(name: string, start: number, stop: number) {
+        return await redis.zrange(name, start, stop);
     }
 };
 

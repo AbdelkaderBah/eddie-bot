@@ -54,19 +54,19 @@ export class SupervisorCluster {
             this.workers.set(`analyzer-${i}`, worker);
         }
 
-        // // Start Supervisor worker
-        // const supervisorWorker = new Worker(path.join(__dirname, 'workers/supervisor.worker.js'));
-        //
-        // supervisorWorker.on('message', (message) => {
-        //     console.log('Message from Supervisor:', message);
-        // });
-        //
-        // supervisorWorker.on('error', (error) => {
-        //     console.error('Error in Supervisor:', error);
-        //     this.restartWorker('supervisor', 0);
-        // });
-        //
-        // this.workers.set('supervisor', supervisorWorker);
+        // Start Supervisor worker
+        const supervisorWorker = new Worker(path.join(__dirname, 'workers/supervisor.worker.js'));
+
+        supervisorWorker.on('message', (message) => {
+            console.log('Message from Supervisor:', message);
+        });
+
+        supervisorWorker.on('error', (error) => {
+            console.error('Error in Supervisor:', error);
+            this.restartWorker('supervisor', 0);
+        });
+
+        this.workers.set('supervisor', supervisorWorker);
     }
 
     private getSymbolsForWorker(workerId: number): string[] {

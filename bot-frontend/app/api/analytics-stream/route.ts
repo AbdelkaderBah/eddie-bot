@@ -15,7 +15,11 @@ const getLastPrice = async (period = 28) => {
   const open: number = lastPrices[lastPrices.length - (period)].price;
   const close: number = lastPrices[lastPrices.length - 1].price;
 
-  return (close - open) / open * 100;
+  return {
+    open,
+    close,
+    change: ((close - open) / open) * 100,
+  };
 };
 
 const getLastVolume = async (period = 14) => {
@@ -48,16 +52,19 @@ export async function GET(req: NextRequest) {
 
   console.log('Subscribing to channel:', channel);
 
-  let unsubscribe = () => {};
+  let unsubscribe: string | number | NodeJS.Timeout | null | undefined = null;
+  let connectionIsOpen = true;
 
   const encoder = new TextEncoder();
   const customReadable = new ReadableStream({
     async start(controller) {
-      controller.enqueue('data: Connected\n\n');
-      
-      setInterval(async () => {
+      // @ts-ignore
+      unsubscribe = setInterval(async () => {
+        if (!connectionIsOpen) return; // Prevent enqueue after close
+
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ 
+            symbol: 'BTCUSDT',
             price: await getLastPrice(),
             volume: await getLastVolume()
           })}\n\n`)
@@ -81,7 +88,8 @@ export async function GET(req: NextRequest) {
     },
     cancel() {
       // Cleanup
-      unsubscribe();
+      connectionIsOpen = false;
+      if(unsubscribe) clearInterval(unsubscribe);
     }
   });
 

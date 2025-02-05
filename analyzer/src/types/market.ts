@@ -33,6 +33,7 @@ export interface BinanceKline {
 }
 
 export interface BriefKline {
+    time: number;
     high: number;
     low: number;
     close: number;

@@ -115,6 +115,7 @@ export class MarketCollector {
         }
 
         const candle: BriefKline = {
+            time: kline.t,
             high: parseFloat(kline.h),
             low: parseFloat(kline.l),
             close: parseFloat(kline.c),

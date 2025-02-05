@@ -52,9 +52,15 @@ export default class IndicatorCollector {
         const vwapData = indicators.vwapIndicator(this.candles);
         const latestVWAP = vwapData[vwapData.length - 1];
 
+        const mlKnn = indicators.mlKnn(this.candles);
+
+
         return {
+            mlKnn: mlKnn && Array.isArray(mlKnn) ? mlKnn[mlKnn.length - 1] : mlKnn,
             latestRSI,
             latestMACD,
+            shortEma: shortEmaData[shortEmaData.length - 1],
+            longEma: longEmaData[longEmaData.length - 1],
             latestBB,
             emaSignal,
             latestVWAP,

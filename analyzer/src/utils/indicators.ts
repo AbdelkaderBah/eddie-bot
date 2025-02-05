@@ -6,6 +6,21 @@ import {
     indicatorStochasticOscillator as stochastic,
 } from 'd3fc-technical-indicator';
 import {BriefKline} from "@/types";
+import {processKlines} from "../utils/ml-knn";
+
+export function mlKnn(candles: BriefKline[]) {
+    return processKlines(candles, {
+        startDate: Date.now() - 64800,
+        stopDate: Date.now() + 64800,
+        indicator: "All",
+        shortWindow: 14,
+        longWindow: 28,
+        baseK: 252,
+        filter: false,
+        bars: 300,
+    });
+}
+
 
 // Configure RSI with a period of 14, using the close price.
 export const rsiIndicator = (data: any[], period: number = 14) => {

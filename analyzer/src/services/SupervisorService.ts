@@ -4,6 +4,7 @@ import { MarketCollector } from './MarketCollector';
 import { MarketEvent } from '../types/market';
 import {Condition} from "../types/conditions";
 import ConditionMatch from "../utils/condition_match";
+import {BollingerRecord, DoKhanana} from "../utils/eddie-chief-khanana";
 
 export class SupervisorService {
     private redis: Redis;
@@ -19,6 +20,10 @@ export class SupervisorService {
         const subscriber = this.redis.duplicate();
 
         await subscriber.subscribe('market_events');
+
+        setInterval(() => {
+            this.gatherKhananaData();
+        }, 1000);
 
         subscriber.on('message', async (channel, message) => {
             if (channel === 'market_events') {
@@ -101,7 +106,7 @@ export class SupervisorService {
     private bots = [
         {
             id: 1,
-            name: 'Bot 1',
+            name: 'Le Racheteur',
             active: false,
             conditions: [
                 {
@@ -153,5 +158,40 @@ export class SupervisorService {
                 });
             }
         });
+    }
+
+    private async gatherKhananaData() {
+        const indicators = (await this.redis.zrange('indicators:BTCUSDT', 0, 100, 'REV')).map(indicator => JSON.parse(indicator));
+
+        const currentPrice = (await this.redis.zrange('events:BTCUSDT:prices', 0, 1, 'REV')).map(price => JSON.parse(price))[0].price;
+
+        const bb: BollingerRecord[] = [
+            {
+                upper: indicators[0]?.latestBB?.upper ?? 0,
+                lower: indicators[0]?.latestBB?.lower ?? 0,
+                middle: indicators[0]?.latestBB?.average ?? 0,
+                currentPrice: currentPrice,
+            }
+        ]
+
+        const output = DoKhanana(
+            indicators[0]?.mlKnn?.signal ?? 0,
+            indicators[9]?.mlKnn?.signal ?? 0,
+            indicators[59]?.mlKnn?.signal ?? 0,
+            indicators[0]?.latestRSI ?? 0,
+            indicators[0]?.shortEma ?? 0,
+            indicators[0]?.longEma ?? 0,
+            bb,
+            indicators[0]?.latestMACD ?? 0
+        );
+
+        // Store event for history
+        await this.redis.zadd(
+            `eddie-chief-khana:BTCUSDT`,
+            Date.now(),
+            JSON.stringify(output)
+        );
+
+        await this.redis.zremrangebyrank(`eddie-chief-khana:BTCUSDT`, 0, -181);
     }
 }

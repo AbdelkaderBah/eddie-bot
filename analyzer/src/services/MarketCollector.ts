@@ -64,6 +64,8 @@ export class MarketCollector {
         const symbol = kline.s;
         this.lastPrice = parseFloat(kline.c);
 
+        this.redis.set('BTCUSDT:price', this.lastPrice.toString());
+
         const analysis: MarketAnalysis = {
             symbol,
             price: this.lastPrice, // Add price to MarketAnalysis
@@ -73,6 +75,7 @@ export class MarketCollector {
             volume: parseFloat(kline.v),
             timestamp: kline.t
         };
+
 
         this.publishEvent({
             name: 'prices',

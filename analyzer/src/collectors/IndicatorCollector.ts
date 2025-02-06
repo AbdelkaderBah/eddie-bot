@@ -1,5 +1,6 @@
 import * as indicators from '../utils/indicators';
 import {BriefKline} from "@/types";
+import {movingAverage} from "../utils/indicators";
 
 export default class IndicatorCollector {
     private candles: BriefKline[] = [];
@@ -54,9 +55,12 @@ export default class IndicatorCollector {
 
         const mlKnn = indicators.mlKnn(this.candles);
 
+        const mavg = indicators.movingAverage(this.candles, 10);
+
 
         return {
             mlKnn: mlKnn && Array.isArray(mlKnn) ? mlKnn[mlKnn.length - 1] : mlKnn,
+            movingAverage: mavg && Array.isArray(mavg) ? mavg[mavg.length - 1] : mavg,
             latestRSI,
             latestMACD,
             shortEma: shortEmaData[shortEmaData.length - 1],

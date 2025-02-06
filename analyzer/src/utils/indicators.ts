@@ -1,5 +1,6 @@
 import {
     indicatorRelativeStrengthIndex as rsi,
+    indicatorMovingAverage as mavg,
     indicatorMacd as macd,
     indicatorBollingerBands as bollingerBand,
     indicatorExponentialMovingAverage as ema,
@@ -27,6 +28,16 @@ export const rsiIndicator = (data: any[], period: number = 14) => {
     const indicator = rsi()
         .period(period)
         .value((d: any) => d.close);;
+
+    return indicator(data);
+}
+
+
+// Configure Moving Average with a period of 14, using the close price.
+export const movingAverage = (data: any[], period: number = 14) => {
+    const indicator = mavg()
+        .period(period)
+        .value((d: any) => d.close);
 
     return indicator(data);
 }

@@ -1,10 +1,15 @@
 // services/SupervisorService.ts
-import { Redis } from 'ioredis';
-import { MarketCollector } from './MarketCollector';
-import { MarketEvent } from '../types/market';
+import {Redis} from 'ioredis';
+import {MarketCollector} from './MarketCollector';
+import {MarketEvent} from '../types/market';
 import {Condition} from "../types/conditions";
 import ConditionMatch from "../utils/condition_match";
 import {BollingerRecord, DoKhanana} from "../utils/eddie-chief-khanana";
+import {DoBuyerS1} from "../utils/eddie-chief-buyer-s1";
+import {DOSellerS1} from "../utils/eddie-chief-seller-s1";
+import {DoAdvancedS1} from "../utils/eddie-chief-advanced-s1";
+import {HelpAfterGod} from "../utils/eddie-chief-help-after-god";
+import {marketBeaterStrategy} from "../utils/eddie-chief-beater";
 
 export class SupervisorService {
     private redis: Redis;
@@ -23,6 +28,10 @@ export class SupervisorService {
 
         setInterval(() => {
             this.gatherKhananaData();
+        }, 1000);
+
+        setInterval(() => {
+            this.gatherBuyerX1Data();
         }, 1000);
 
         subscriber.on('message', async (channel, message) => {
@@ -140,13 +149,15 @@ export class SupervisorService {
         const lastPrices = await this.getLastPrices();
         const lastVolumes = await this.getLastVolumes();
 
+        if(lastPrices.length < 80 || lastVolumes.length < 80) return;
+
         this.bots.filter(bot => {
-            if(bot.active) return false;
+            if (bot.active) return false;
 
             const name = bot.name;
             const conditions = bot.conditions;
 
-            const conditionsMet =  conditions.every((condition: Condition) => {
+            const conditionsMet = conditions.every((condition: Condition) => {
                 return (new ConditionMatch(condition, lastPrices, lastVolumes)).check();
             });
 
@@ -163,7 +174,11 @@ export class SupervisorService {
     private async gatherKhananaData() {
         const indicators = (await this.redis.zrange('indicators:BTCUSDT', 0, 100, 'REV')).map(indicator => JSON.parse(indicator));
 
+        if (indicators.length < 60) return;
+
         const currentPrice = (await this.redis.zrange('events:BTCUSDT:prices', 0, 1, 'REV')).map(price => JSON.parse(price))[0].price;
+
+        const volumes = (await this.redis.zrange('events:BTCUSDT:depths', 0, 20, 'REV')).map(indicator => JSON.parse(indicator));
 
         const bb: BollingerRecord[] = [
             {
@@ -174,7 +189,7 @@ export class SupervisorService {
             }
         ]
 
-        const output = DoKhanana(
+        const outputKhanana = DoKhanana(
             indicators[0]?.mlKnn?.signal ?? 0,
             indicators[9]?.mlKnn?.signal ?? 0,
             indicators[59]?.mlKnn?.signal ?? 0,
@@ -182,16 +197,117 @@ export class SupervisorService {
             indicators[0]?.shortEma ?? 0,
             indicators[0]?.longEma ?? 0,
             bb,
-            indicators[0]?.latestMACD ?? 0
+            indicators[0]?.latestMACD ?? 0,
         );
+
+        const outputHelpAfterGod = HelpAfterGod(
+            indicators.slice(0, 10).map(indicator => indicator?.mlKnn?.signal),
+            indicators.slice(0, 10).map(indicator => indicator?.latestRSI),
+            volumes.slice(0, 10).map(volume => volume.additionalData.buyVolume),
+            volumes.slice(0, 10).map(volume => volume.additionalData.sellVolume),
+            (await this.redis.zrange('events:BTCUSDT:prices', 0, 60, 'REV')).map(price => JSON.parse(price).price)
+        );
+
+
+        const outputMarketBeaterStrategy = marketBeaterStrategy(
+            indicators.slice(0, 10).map(indicator => indicator?.mlKnn?.signal),
+            indicators.slice(0, 10).map(indicator => indicator?.latestRSI),
+            volumes.slice(0, 10).map(volume => volume.additionalData.buyVolume),
+            volumes.slice(0, 10).map(volume => volume.additionalData.sellVolume),
+            (await this.redis.zrange('events:BTCUSDT:prices', 0, 60, 'REV')).map(price => JSON.parse(price).price),
+            indicators[0]?.movingAverage ?? 0,
+            volumes.reduce((acc, volume) => acc + volume.volume, 0) / volumes.length,
+        );
+
+        const outputAdvancedS1 = DoAdvancedS1(
+            indicators[0]?.mlKnn?.signal ?? 0,
+            indicators[9]?.mlKnn?.signal ?? 0,
+            indicators[59]?.mlKnn?.signal ?? 0,
+            indicators[0]?.latestRSI ?? 0,
+            indicators[0]?.shortEma ?? 0,
+            indicators[0]?.longEma ?? 0,
+            bb[0],
+            indicators[0]?.latestMACD ?? 0,
+            indicators[0]?.movingAverage ?? 0,
+            //@ts-ignore
+            {
+                currentVolume: volumes[0]?.volume,
+                avgVolume: volumes.reduce((acc, volume) => acc + volume.volume, 0) / volumes.length
+            }
+        );
+
+        if (outputKhanana !== 'HOLD' || outputAdvancedS1.decision !== 'HOLD' || outputHelpAfterGod.decision !== 'HOLD' || outputMarketBeaterStrategy.decision !== 'HOLD') {
+            console.log('Eddie chief says:', {
+                outputAdvancedS1,
+                outputKhanana,
+                outputHelpAfterGod,
+                outputMarketBeaterStrategy
+            });
+        }
 
         // Store event for history
         await this.redis.zadd(
-            `eddie-chief-khana:BTCUSDT`,
+            `eddie-chief-advanced:BTCUSDT`,
             Date.now(),
-            JSON.stringify(output)
+            JSON.stringify({
+                outputKhanana,
+                outputAdvancedS1,
+                outputHelpAfterGod,
+                outputMarketBeaterStrategy,
+                timestamp: Date.now(),
+            })
         );
 
-        await this.redis.zremrangebyrank(`eddie-chief-khana:BTCUSDT`, 0, -181);
+        await this.redis.zremrangebyrank(`eddie-chief-advanced:BTCUSDT`, 0, -181);
+    }
+
+    private async gatherBuyerX1Data() {
+        const indicators = (await this.redis.zrange('indicators:BTCUSDT', 0, 1, 'REV')).map(indicator => JSON.parse(indicator));
+        const volumes = (await this.redis.zrange('events:BTCUSDT:depths', 0, 20, 'REV')).map(indicator => JSON.parse(indicator));
+
+        // @ts-ignore
+        const mlKNN = {
+            '1': 'BUY',
+            '-1': 'SELL',
+            '0': 'HOLD',
+        }[(indicators[0]?.mlKnn?.signal ?? 0).toString()];
+
+        const rsi = indicators[0]?.latestRSI ?? 0;
+
+        let BuyVolumes = [];
+        let SellVolumes = [];
+
+        let i = 0;
+        for (const volume of volumes) {
+            if (i < 5) BuyVolumes.push(volume.additionalData.buyVolume);
+
+            SellVolumes.push(volume.additionalData.sellVolume);
+
+            i++;
+        }
+
+        const outputBuyerS1 = DoBuyerS1(mlKNN, rsi, BuyVolumes, SellVolumes);
+        const outputSellerS1 = DOSellerS1(mlKNN, rsi, BuyVolumes, SellVolumes);
+
+        if (outputBuyerS1 !== 'HOLD' || outputSellerS1 !== 'HOLD') {
+            console.log('Eddie chief', {
+                outputBuyerS1,
+                outputSellerS1,
+                timestamp: Date.now(),
+            });
+        }
+
+        // Store event for history
+        await this.redis.zadd(
+            `eddie-chief-s1:BTCUSDT`,
+            Date.now(),
+            JSON.stringify({
+                outputBuyerS1,
+                outputSellerS1,
+                timestamp: Date.now()
+            })
+        );
+
+        await this.redis.zremrangebyrank(`eddie-chief-s1:BTCUSDT`, 0, -181);
     }
 }

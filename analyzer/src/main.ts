@@ -67,6 +67,20 @@ export class SupervisorCluster {
         });
 
         this.workers.set('supervisor', supervisorWorker);
+
+        // Start Trader worker
+        const traderWorker = new Worker(path.join(__dirname, 'workers/trader.worker.js'));
+
+        traderWorker.on('message', (message) => {
+            console.log('Message from Trader:', message);
+        });
+
+        traderWorker.on('error', (error) => {
+            console.error('Error in Trader:', error);
+            this.restartWorker('supervisor', 0);
+        });
+
+        this.workers.set('trader', traderWorker);
     }
 
     private getSymbolsForWorker(workerId: number): string[] {

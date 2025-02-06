@@ -22,7 +22,10 @@ export class TradeService {
 
     private async update() {
         for (const tradeId of this.tradeIds) {
-            await updateTradePNL(tradeId, async () => await this.getCurrentPrice());
+            updateTradePNL(tradeId, async () => await this.getCurrentPrice()).then(() => {
+                console.log(`Trade ${tradeId} updated.`);
+            });
+
             this.tradeIds.shift()
         }
     }
@@ -46,6 +49,8 @@ export class TradeService {
 
         // Execute the trade by saving it in Redis.
         await executeTrade(tradeId, tradeData);
+
+        this.tradeIds.push(tradeId);
 
         this.update();
     }

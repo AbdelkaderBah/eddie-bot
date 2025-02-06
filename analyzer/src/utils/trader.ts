@@ -28,11 +28,11 @@ export interface TradeData {
 
 export function convertToBtc(currentPriceInUSD: number, amountInUsd: number): number {
     // @ts-ignore
-    return (amountInUsd / currentPriceInUSD).toFixed(2) * 1;
+    return (amountInUsd / currentPriceInUSD).toFixed(8) * 1;
 }
 
 // Create a Redis client.
-const client = new Redis('redis://localhost:6379');
+const client = new Redis(process.env.REDIS_URL || '');
 
 client.on('error', (err) => console.error('Redis Client Error', err));
 

@@ -236,14 +236,14 @@ export class SupervisorService {
             }
         );
 
-        if (outputKhanana !== 'HOLD' || outputAdvancedS1.decision !== 'HOLD' || outputHelpAfterGod.decision !== 'HOLD' || outputMarketBeaterStrategy.decision !== 'HOLD') {
-            console.log('Eddie chief says:', {
-                outputAdvancedS1,
-                outputKhanana,
-                outputHelpAfterGod,
-                outputMarketBeaterStrategy
-            });
-        }
+        // if (outputKhanana !== 'HOLD' || outputAdvancedS1.decision !== 'HOLD' || outputHelpAfterGod.decision !== 'HOLD' || outputMarketBeaterStrategy.decision !== 'HOLD') {
+        //     console.log('Eddie chief says:', {
+        //         outputAdvancedS1,
+        //         outputKhanana,
+        //         outputHelpAfterGod,
+        //         outputMarketBeaterStrategy
+        //     });
+        // }
 
         // Store event for history
         await this.redis.zadd(

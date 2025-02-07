@@ -329,19 +329,6 @@ export class SupervisorService {
         if (outputSellerS1 === 'SELL') {
             this.createTrade('buyer-s1', outputSellerS1);
         }
-
-        // Store event for history
-        await this.redis.zadd(
-            `eddie-chief-s1:BTCUSDT`,
-            Date.now(),
-            JSON.stringify({
-                outputBuyerS1,
-                outputSellerS1,
-                timestamp: Date.now()
-            })
-        );
-
-        await this.redis.zremrangebyrank(`eddie-chief-s1:BTCUSDT`, 0, -181);
     }
 
     private trades: {[key: string]: string} = {};

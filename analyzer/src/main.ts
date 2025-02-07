@@ -32,27 +32,27 @@ export class SupervisorCluster {
             this.workers.set(`collector-${i}`, worker);
         }
 
-        // Start Market Analyzer workers
-        for (let i = 0; i < this.NUM_ANALYZERS; i++) {
-            const worker = new Worker(path.join(__dirname, 'workers/marketAnalyzer.worker.js'), {
-                workerData: {
-                    workerId: `analyzer-${i}`,
-                    symbols: this.getSymbolsForWorker(i)
-                }
-            });
-
-            worker.on('message', (message) => {
-                console.log(`Message from Analyzer ${i}:`, message);
-            });
-
-            worker.on('error', (error) => {
-                console.error(`Error in Analyzer ${i}:`, error);
-                // Restart worker on error
-                this.restartWorker('analyzer', i);
-            });
-
-            this.workers.set(`analyzer-${i}`, worker);
-        }
+        // // Start Market Analyzer workers
+        // for (let i = 0; i < this.NUM_ANALYZERS; i++) {
+        //     const worker = new Worker(path.join(__dirname, 'workers/marketAnalyzer.worker.js'), {
+        //         workerData: {
+        //             workerId: `analyzer-${i}`,
+        //             symbols: this.getSymbolsForWorker(i)
+        //         }
+        //     });
+        //
+        //     worker.on('message', (message) => {
+        //         console.log(`Message from Analyzer ${i}:`, message);
+        //     });
+        //
+        //     worker.on('error', (error) => {
+        //         console.error(`Error in Analyzer ${i}:`, error);
+        //         // Restart worker on error
+        //         this.restartWorker('analyzer', i);
+        //     });
+        //
+        //     this.workers.set(`analyzer-${i}`, worker);
+        // }
 
         // Start Supervisor worker
         const supervisorWorker = new Worker(path.join(__dirname, 'workers/supervisor.worker.js'));

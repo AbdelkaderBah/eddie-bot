@@ -392,6 +392,8 @@ export class SupervisorService {
         const volumes = (await this.getLastVolumes()).reverse();
         const indicators = (await this.redis.zrange('indicators:BTCUSDT', 0, 100, 'REV')).map(indicator => JSON.parse(indicator)).reverse();
 
+        if (prices.length < 60 || volumes.length < 60 || indicators.length < 10) return;
+
         const data: StrategyInputClaudeX1 = {
             prices,
             buyVolumes: volumes.slice(0, 10).map(volume => volume.additionalData.buyVolume),

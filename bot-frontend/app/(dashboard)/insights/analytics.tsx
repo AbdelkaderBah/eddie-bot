@@ -331,13 +331,13 @@ const BotAnalytics: React.FC<BotAnalyticsProps> = ({ bots }) => {
               'Total P&L',
               `$${currentData.totalPnl.toFixed(2)}`,
               <DollarSign className="h-4 w-4" />,
-              5.2
+              0
             )}
             {renderMetricCard(
               'Win Rate',
               `${currentData.winRate.toFixed(1)}%`,
               <Activity className="h-4 w-4" />,
-              2.1
+              0
             )}
             {renderMetricCard(
               'Profit Factor',
@@ -348,7 +348,7 @@ const BotAnalytics: React.FC<BotAnalyticsProps> = ({ bots }) => {
               'Max Drawdown',
               `${currentData.maxDrawdown.toFixed(1)}%`,
               <TrendingDown className="h-4 w-4" />,
-              -1.5
+              0
             )}
           </div>
 
@@ -492,7 +492,15 @@ const BotAnalytics: React.FC<BotAnalyticsProps> = ({ bots }) => {
 
                     <TabsContent value="trades">
                       <div className="space-y-4">
-                        {selectedBot.trades.slice(0, 5).map((trade) => (
+                        {selectedBot.trades.sort((a, b) => {
+                          if (a.closeTime < b.closeTime) {
+                            return 1;
+                          } else if (a.closeTime > b.closeTime) {
+                            return -1;
+                          }
+                          // a must be equal to b
+                          return 0;
+                        }).map((trade) => (
                           <div
                             key={trade.id}
                             className="flex items-center justify-between p-4 border rounded-lg"

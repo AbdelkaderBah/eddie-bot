@@ -10,6 +10,11 @@ import {DOSellerS1} from "../utils/eddie-chief-seller-s1";
 import {DoAdvancedS1} from "../utils/eddie-chief-advanced-s1";
 import {HelpAfterGod} from "../utils/eddie-chief-help-after-god";
 import {marketBeaterStrategy} from "../utils/eddie-chief-beater";
+import {StrategyInputClaudeX1, TradingStrategyClaudeX1} from "../utils/eddie-chief-claude-x1";
+import {TradingStrategyClaudeX2} from "../utils/eddie-chief-claude-x2";
+import {TradingStrategyClaudeX3} from "../utils/eddie-chief-claude-x3";
+import {TradingStrategyClaudeX4} from "../utils/eddie-chief-claude-x4";
+import {TradingStrategyClaudeX5} from "../utils/eddie-chief-claude-x5";
 
 export class SupervisorService {
     private redis: Redis;
@@ -32,6 +37,10 @@ export class SupervisorService {
 
         setInterval(() => {
             this.gatherBuyerX1Data();
+        }, 1000);
+
+        setInterval(() => {
+            this.gatherClaudeX1Data();
         }, 1000);
 
         subscriber.on('message', async (channel, message) => {
@@ -241,15 +250,15 @@ export class SupervisorService {
             }
         );
 
-        if(outputHelpAfterGod.decision !== 'HOLD') {
+        if (outputHelpAfterGod.decision !== 'HOLD') {
             this.createTrade('help-after-god', outputHelpAfterGod.decision);
         }
 
-        if(outputAdvancedS1.decision !== 'HOLD') {
+        if (outputAdvancedS1.decision !== 'HOLD') {
             this.createTrade('advanced-s1', outputAdvancedS1.decision);
         }
 
-        if(outputKhanana !== 'HOLD') {
+        if (outputKhanana !== 'HOLD') {
             this.createTrade('khanana', outputKhanana);
         }
 
@@ -307,11 +316,11 @@ export class SupervisorService {
             });
         }
 
-        if (outputBuyerS1 === 'BUY'){
+        if (outputBuyerS1 === 'BUY') {
             this.createTrade('buyer-s1', outputBuyerS1);
         }
 
-        if (outputSellerS1 === 'SELL'){
+        if (outputSellerS1 === 'SELL') {
             this.createTrade('buyer-s1', outputSellerS1);
         }
 
@@ -332,7 +341,7 @@ export class SupervisorService {
     private async createTrade(name: string, decision: "BUY" | "SELL") {
         const [cursor, elements] = await this.redis.hscan('trade:active', 0, 'MATCH', `${name}*`)
 
-        if(elements.length){
+        if (elements.length) {
             console.log('Trade already active', name);
             return;
         }
@@ -355,16 +364,93 @@ export class SupervisorService {
 
         this.marketBeats[decision]++;
 
-        if(this.marketBeatsCount < 10) return;
+        if (this.marketBeatsCount < 10) return;
 
         this.marketBeatsCount = -60;
 
-        if(this.marketBeats['BUY'] > 4 && this.marketBeats['SELL'] > 2) {
+        if (this.marketBeats['BUY'] > 4 && this.marketBeats['SELL'] > 2) {
             this.createTrade('market-beater', 'BUY');
-        } else if(this.marketBeats['SELL'] > 4 && this.marketBeats['BUY'] > 2) {
+        } else if (this.marketBeats['SELL'] > 4 && this.marketBeats['BUY'] > 2) {
             this.createTrade('market-beater', 'SELL');
         }
 
         this.marketBeats = {'BUY': 0, 'SELL': 0, 'HOLD': 0};
+    }
+
+    private claudeData: StrategyInputClaudeX1[] = [];
+
+    private async gatherClaudeX1Data() {
+        const claude = new TradingStrategyClaudeX1();
+
+        const prices = (await this.getLastPrices()).reverse();
+        const volumes = (await this.getLastVolumes()).reverse();
+        const indicators = (await this.redis.zrange('indicators:BTCUSDT', 0, 100, 'REV')).map(indicator => JSON.parse(indicator)).reverse();
+
+        const data: StrategyInputClaudeX1 = {
+            prices,
+            buyVolumes: volumes.slice(0, 10).map(volume => volume.additionalData.buyVolume),
+            sellVolumes: volumes.slice(0, 10).map(volume => volume.additionalData.sellVolume),
+            knn: indicators.slice(0, 10).map(indicator => indicator?.mlKnn?.signal),
+            macd: indicators.slice(0, 10).map(indicator => indicator?.latestMACD),
+            rsi: indicators.slice(0, 10).map(indicator => indicator?.latestRSI),
+            bollingerBands: indicators.slice(-1).map(indicator => ({
+                upper: [indicator?.latestBB?.upper ?? 0],
+                middle: [indicator?.latestBB?.average ?? 0],
+                lower: [indicator?.latestBB?.lower ?? 0],
+            }))[0],
+            shortEma: indicators.slice(0, 10).map(indicator => indicator?.shortEma),
+            longEma: indicators.slice(0, 10).map(indicator => indicator?.longEma),
+            stochastic: indicators.slice(-1).map(indicator => ({
+                k: [indicator?.stochasticOscillatorSignal.k],
+                d: [indicator?.stochasticOscillatorSignal.d],
+            }))[0],
+            vwap: indicators.slice(0, 10).map(indicator => indicator?.latestVWAP),
+        };
+
+        this.claudeData.push(data);
+
+        const outputX1 = claude.analyze(data);
+
+        if (outputX1 !== 'HOLD') {
+            this.createTrade('claude-x1', outputX1);
+        }
+
+        const claudeX2 = new TradingStrategyClaudeX2();
+
+        const outputX2 = claudeX2.analyze(data);
+
+        if (outputX2 !== 'HOLD') {
+            this.createTrade('claude-x2', outputX2);
+        }
+
+        const claudeX3 = new TradingStrategyClaudeX3();
+
+        const outputX3 = claudeX3.analyze(data);
+
+        if (outputX3 !== 'HOLD') {
+            this.createTrade('claude-x3', outputX3);
+        }
+
+        const claudeX4 = new TradingStrategyClaudeX4();
+
+        const outputX4 = claudeX4.analyze(data);
+
+        if (outputX4 !== 'HOLD') {
+            this.createTrade('claude-x4', outputX4);
+        }
+
+        const claudeX5 = new TradingStrategyClaudeX5();
+
+        const outputX5 = claudeX5.analyze({
+            inputs: this.claudeData
+        });
+
+        if(this.claudeData.length > 30){
+            this.claudeData.shift();
+        }
+
+        if (outputX5 !== 'HOLD') {
+            this.createTrade('claude-x4', outputX5);
+        }
     }
 }

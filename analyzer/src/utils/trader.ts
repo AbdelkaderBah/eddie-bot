@@ -179,7 +179,7 @@ export async function updateTradePNL(
 
         // Save the updated trade data.
         await client.hset(`trade:active`, tradeId, JSON.stringify(tradeData));
-        console.log(`Updated PNL at ${seconds}s: ${pnl}`);
+        console.log(`Updated ${tradeKey} PNL at ${seconds}s: ${pnl}`);
 
         i++;
     }

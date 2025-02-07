@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "d3fc-technical-indicator": "^6.1.1",
-    "ws": "*"
+    "ws": "*",
+    "ioredis": "^5.4.2"
   }
 }

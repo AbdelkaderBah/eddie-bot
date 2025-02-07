@@ -344,7 +344,13 @@ export class SupervisorService {
         await this.redis.zremrangebyrank(`eddie-chief-s1:BTCUSDT`, 0, -181);
     }
 
+    private trades: {[key: string]: string} = {};
+
     private async createTrade(name: string, decision: "BUY" | "SELL") {
+        if(this.trades[name]) return;
+
+        this.trades[name] = name;
+
         const [cursor, elements] = await this.redis.hscan('trade:active', 0, 'MATCH', `${name}*`)
 
         if (elements.length) {
@@ -360,6 +366,10 @@ export class SupervisorService {
             stopLoss: undefined,
             takeProfit: undefined,
         }));
+
+        setTimeout(() => {
+            delete this.trades[name];
+        }, 2000)
     }
 
     private marketBeats = {'BUY': 0, 'SELL': 0, 'HOLD': 0};

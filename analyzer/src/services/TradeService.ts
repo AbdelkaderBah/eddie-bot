@@ -3,12 +3,13 @@ import {convertToBtc, executeTrade, TradeData, updateTradePNL} from "../utils/tr
 
 export class TradeService {
     private redis: Redis;
-    private tradeIds: string[] = [];
 
     constructor(redisUrl: string) {
         this.redis = new Redis(redisUrl);
         this.update();
         this.executeTrades();
+
+        console.log('Trade service started.');
     }
 
     public close() {
@@ -21,37 +22,69 @@ export class TradeService {
     }
 
     private async update() {
-        for (const tradeId of this.tradeIds) {
-            updateTradePNL(tradeId, async () => await this.getCurrentPrice()).then(() => {
-                console.log(`Trade ${tradeId} updated.`);
-            });
+        const subscriber = this.redis.duplicate();
 
-            this.tradeIds.shift()
-        }
+        subscriber.subscribe('trades:dispatched');
+
+        subscriber.on('message', async (channel, message) => {
+            console.log(`Trade ${message} received.`);
+
+            updateTradePNL(
+                message,
+                async () => await this.getCurrentPrice(),
+                [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+            ).then(() => {
+                console.log(`Trade ${message} updated.`);
+            });
+        });
     }
 
     private async executeTrades() {
-        const tradeId = 'trade_001';
+        const subscriber = this.redis.duplicate();
 
-        const currentPrice = await this.getCurrentPrice();
-        const quantity = convertToBtc(currentPrice, 100);
+        subscriber.subscribe('trades:waiting');
 
-        const tradeData: TradeData = {
-            price: (await this.getCurrentPrice()),            // Entry price in USD
-            quantity: quantity,           // Position size (in BTC)
-            side: 'LONG',            // Trade direction: 'LONG' or 'SHORT'
-            leverage: 1,            // Leverage factor
-            timestamp: Date.now(),
-            status: 'open',
-            stopLoss: currentPrice - 100,         // Optional stop loss level
-            takeProfit: currentPrice + 200        // Optional take profit level
-        };
+        subscriber.on('message', async (channel, message) => {
+            console.log(`Trade ${message} processing.`);
 
-        // Execute the trade by saving it in Redis.
-        await executeTrade(tradeId, tradeData);
+            let {name, side, leverage, amountInUSD, stopLoss, takeProfit} = JSON.parse(message);
 
-        this.tradeIds.push(tradeId);
+            const tradeId = `${name}:${Math.random().toString(8).substring(7)}`;
 
-        this.update();
+            const currentPrice = await this.getCurrentPrice();
+            const quantity = convertToBtc(currentPrice, amountInUSD);
+
+            if (stopLoss !== undefined && 1 > stopLoss) {
+                if (side === 'LONG') {
+                    stopLoss = currentPrice * (1 - stopLoss);
+                } else {
+                    stopLoss = currentPrice * (1 + stopLoss);
+                }
+            }
+
+            if (takeProfit !== undefined && 1 > takeProfit) {
+                if (side === 'LONG') {
+                    takeProfit = currentPrice * (1 + takeProfit);
+                } else {
+                    takeProfit = currentPrice * (1 - takeProfit);
+                }
+            }
+
+            const tradeData: TradeData = {
+                price: currentPrice,            // Entry price in USD
+                quantity: quantity,           // Position size (in BTC)
+                timestamp: Date.now(),
+                status: 'open',
+                side,            // Trade direction: 'LONG' or 'SHORT'
+                leverage,            // Leverage factor
+                stopLoss,         // Optional stop loss level
+                takeProfit        // Optional take profit level
+            };
+
+            // Execute the trade by saving it in Redis.
+            executeTrade(tradeId, tradeData).then();
+        });
+
+
     }
 }

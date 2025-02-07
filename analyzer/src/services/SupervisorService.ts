@@ -149,7 +149,7 @@ export class SupervisorService {
         const lastPrices = await this.getLastPrices();
         const lastVolumes = await this.getLastVolumes();
 
-        if(lastPrices.length < 80 || lastVolumes.length < 80) return;
+        if (lastPrices.length < 80 || lastVolumes.length < 80) return;
 
         this.bots.filter(bot => {
             if (bot.active) return false;
@@ -164,9 +164,14 @@ export class SupervisorService {
             if (conditionsMet) {
                 bot.active = true;
 
-                console.log(`Bot ${name} activated!`, {
-                    price: lastPrices[lastPrices.length - 1].price,
-                });
+                this.redis.publish('trades:waiting', JSON.stringify({
+                    name,
+                    side: 'LONG',
+                    leverage: 1,
+                    amountInUSD: 100,
+                    stopLoss: undefined,
+                    takeProfit: undefined,
+                }));
             }
         });
     }
@@ -236,14 +241,19 @@ export class SupervisorService {
             }
         );
 
-        // if (outputKhanana !== 'HOLD' || outputAdvancedS1.decision !== 'HOLD' || outputHelpAfterGod.decision !== 'HOLD' || outputMarketBeaterStrategy.decision !== 'HOLD') {
-        //     console.log('Eddie chief says:', {
-        //         outputAdvancedS1,
-        //         outputKhanana,
-        //         outputHelpAfterGod,
-        //         outputMarketBeaterStrategy
-        //     });
-        // }
+        if(outputHelpAfterGod.decision !== 'HOLD') {
+            this.createTrade('help-after-god', outputHelpAfterGod.decision);
+        }
+
+        if(outputAdvancedS1.decision !== 'HOLD') {
+            this.createTrade('advanced-s1', outputAdvancedS1.decision);
+        }
+
+        if(outputKhanana !== 'HOLD') {
+            this.createTrade('khanana', outputKhanana);
+        }
+
+        this.marketBeaterStrategy(outputMarketBeaterStrategy.decision);
 
         // Store event for history
         await this.redis.zadd(
@@ -297,6 +307,14 @@ export class SupervisorService {
             });
         }
 
+        if (outputBuyerS1 === 'BUY'){
+            this.createTrade('buyer-s1', outputBuyerS1);
+        }
+
+        if (outputSellerS1 === 'SELL'){
+            this.createTrade('buyer-s1', outputSellerS1);
+        }
+
         // Store event for history
         await this.redis.zadd(
             `eddie-chief-s1:BTCUSDT`,
@@ -309,5 +327,44 @@ export class SupervisorService {
         );
 
         await this.redis.zremrangebyrank(`eddie-chief-s1:BTCUSDT`, 0, -181);
+    }
+
+    private async createTrade(name: string, decision: "BUY" | "SELL") {
+        const [cursor, elements] = await this.redis.hscan('trade:active', 0, 'MATCH', `${name}*`)
+
+        if(elements.length){
+            console.log('Trade already active', name);
+            return;
+        }
+
+        this.redis.publish('trades:waiting', JSON.stringify({
+            name,
+            side: decision === 'BUY' ? 'LONG' : 'SHORT',
+            leverage: 1,
+            amountInUSD: 100,
+            stopLoss: undefined,
+            takeProfit: undefined,
+        }));
+    }
+
+    private marketBeats = {'BUY': 0, 'SELL': 0, 'HOLD': 0};
+    private marketBeatsCount = 0;
+
+    private marketBeaterStrategy(decision: 'HOLD' | 'BUY' | 'SELL') {
+        this.marketBeatsCount++;
+
+        this.marketBeats[decision]++;
+
+        if(this.marketBeatsCount < 10) return;
+
+        this.marketBeatsCount = -60;
+
+        if(this.marketBeats['BUY'] > 4 && this.marketBeats['SELL'] > 2) {
+            this.createTrade('market-beater', 'BUY');
+        } else if(this.marketBeats['SELL'] > 4 && this.marketBeats['BUY'] > 2) {
+            this.createTrade('market-beater', 'SELL');
+        }
+
+        this.marketBeats = {'BUY': 0, 'SELL': 0, 'HOLD': 0};
     }
 }

@@ -20,7 +20,7 @@ export interface TradeData {
     status: string;
     stopLoss?: number;    // Optional stop loss level
     takeProfit?: number;  // Optional take profit level
-    pnlSnapshots?: { [interval: string]: number };
+    pnlSnapshots?: { [interval: string]: [number, number] };
     liquiditySnapshots?: LiquiditySnapshot[];
     closedAt?: number;
 }
@@ -50,7 +50,10 @@ async function connectRedis(): Promise<void> {
  */
 export async function executeTrade(tradeId: string, tradeData: TradeData): Promise<void> {
     await connectRedis();
-    await client.set(`trade:${tradeId}`, JSON.stringify(tradeData));
+    await client.hset(`trade:active`, tradeId, JSON.stringify(tradeData));
+
+    client.publish('trades:dispatched', tradeId);
+
     console.log(`Trade ${tradeId} executed and saved.`);
 }
 
@@ -70,7 +73,7 @@ function calculatePNL(entryPrice: number, currentPrice: number, quantity: number
 /**
  * Records a liquidity snapshot to the trade data and persists it in Redis.
  */
-async function recordLiquiditySnapshot(tradeKey: string, tradeData: TradeData, currentPrice: number, reason: SnapshotReason): Promise<void> {
+async function recordLiquiditySnapshot(tradeId: string, tradeData: TradeData, currentPrice: number, reason: SnapshotReason): Promise<void> {
     const snapshot: LiquiditySnapshot = {
         timestamp: Date.now(),
         currentPrice,
@@ -80,7 +83,7 @@ async function recordLiquiditySnapshot(tradeKey: string, tradeData: TradeData, c
     tradeData.liquiditySnapshots = tradeData.liquiditySnapshots || [];
     tradeData.liquiditySnapshots.push(snapshot);
     // Persist the updated trade data.
-    await client.set(tradeKey, JSON.stringify(tradeData));
+    await client.hset(`trade:active`, tradeId, JSON.stringify(tradeData));
     console.log(`Liquidity snapshot recorded:`, snapshot);
 }
 
@@ -97,8 +100,8 @@ export async function updateTradePNL(
     intervals: number[] = [10, 20, 30, 60]
 ): Promise<void> {
     await connectRedis();
-    const tradeKey = `trade:${tradeId}`;
-    const tradeStr = await client.get(tradeKey);
+    const tradeKey = `${tradeId}`;
+    const tradeStr = await client.hget(`trade:active`, tradeKey);
 
     if (!tradeStr) {
         console.error(`Trade ${tradeId} not found.`);
@@ -110,12 +113,14 @@ export async function updateTradePNL(
     const quantity = tradeData.quantity;
     const side = tradeData.side;
     const leverage = tradeData.leverage;
-    const pnlSnapshots: { [interval: string]: number } = {};
+    const pnlSnapshots: { [interval: string]: [number, number] } = {};
 
     // Define a liquidation threshold (for simulation) as 1/leverage.
     // For example, a 10x leveraged LONG might be liquidated if price falls 10% below entry.
     const liquidationThreshold = 1 / leverage;
     let tradeClosedEarly = false;
+
+    let i = 0;
 
     for (const seconds of intervals) {
         // Wait for the specified interval.
@@ -167,19 +172,26 @@ export async function updateTradePNL(
 
         // Calculate PNL and update snapshot.
         const pnl = calculatePNL(entryPrice, currentPrice, quantity, side, leverage);
-        pnlSnapshots[`${seconds}s`] = pnl;
+
+
+        pnlSnapshots[`${i}:${seconds}s`] = [currentPrice, pnl];
         tradeData.pnlSnapshots = pnlSnapshots;
 
         // Save the updated trade data.
-        await client.set(tradeKey, JSON.stringify(tradeData));
+        await client.hset(`trade:active`, tradeId, JSON.stringify(tradeData));
         console.log(`Updated PNL at ${seconds}s: ${pnl}`);
+
+        i++;
     }
 
     // Close the trade if it wasn't already closed by a trigger.
     tradeData.status = 'closed';
     tradeData.closedAt = Date.now();
     tradeData.pnlSnapshots = pnlSnapshots;
-    await client.set(tradeKey, JSON.stringify(tradeData));
+
+    client.hdel(`trade:active`, tradeId);
+
+    await client.hset(`trade:closed`, tradeId, JSON.stringify(tradeData));
     if (!tradeClosedEarly) {
         console.log(`Trade ${tradeId} closed normally. Final PNL snapshots:`, pnlSnapshots);
     } else {

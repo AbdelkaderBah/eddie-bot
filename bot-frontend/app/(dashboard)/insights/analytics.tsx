@@ -331,13 +331,13 @@ const BotAnalytics: React.FC<BotAnalyticsProps> = ({ bots }) => {
               'Total P&L',
               `$${currentData.totalPnl.toFixed(2)}`,
               <DollarSign className="h-4 w-4" />,
-              5.2
+              0
             )}
             {renderMetricCard(
               'Win Rate',
               `${currentData.winRate.toFixed(1)}%`,
               <Activity className="h-4 w-4" />,
-              2.1
+              0
             )}
             {renderMetricCard(
               'Profit Factor',
@@ -348,7 +348,7 @@ const BotAnalytics: React.FC<BotAnalyticsProps> = ({ bots }) => {
               'Max Drawdown',
               `${currentData.maxDrawdown.toFixed(1)}%`,
               <TrendingDown className="h-4 w-4" />,
-              -1.5
+              0
             )}
           </div>
 

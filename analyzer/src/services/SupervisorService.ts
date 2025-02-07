@@ -36,15 +36,15 @@ export class SupervisorService {
 
         setInterval(() => {
             this.gatherChatgptData();
-        }, 5500);
+        }, 5000);
 
         setInterval(() => {
             this.gatherBuyerX1Data();
-        }, 7500);
+        }, 20000);
 
         setInterval(() => {
             this.gatherClaudeX1Data();
-        }, 2500);
+        }, 3000);
 
         subscriber.on('message', async (channel, message) => {
             if (channel === 'market_events') {

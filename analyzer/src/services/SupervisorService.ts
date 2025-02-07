@@ -15,6 +15,9 @@ import {TradingStrategyClaudeX2} from "../utils/eddie-chief-claude-x2";
 import {TradingStrategyClaudeX3} from "../utils/eddie-chief-claude-x3";
 import {TradingStrategyClaudeX4} from "../utils/eddie-chief-claude-x4";
 import {TradingStrategyClaudeX5} from "../utils/eddie-chief-claude-x5";
+import {TradingStrategyClaudeX6} from "../utils/eddie-chief-claude-x6";
+import {TradingStrategyClaudeX7} from "../utils/eddie-chief-claude-x7";
+import {TradingStrategyClaudeX8} from "../utils/eddie-chief-claude-x8";
 
 export class SupervisorService {
     private redis: Redis;
@@ -32,16 +35,16 @@ export class SupervisorService {
         await subscriber.subscribe('market_events');
 
         setInterval(() => {
-            this.gatherKhananaData();
-        }, 1000);
+            this.gatherChatgptData();
+        }, 11000);
 
         setInterval(() => {
             this.gatherBuyerX1Data();
-        }, 1000);
+        }, 15000);
 
         setInterval(() => {
             this.gatherClaudeX1Data();
-        }, 1000);
+        }, 7000);
 
         subscriber.on('message', async (channel, message) => {
             if (channel === 'market_events') {
@@ -125,7 +128,8 @@ export class SupervisorService {
         {
             id: 1,
             name: 'Le Racheteur',
-            active: false,
+            // disabled...
+            active: true,
             conditions: [
                 {
                     type: 'PRICE',
@@ -185,7 +189,7 @@ export class SupervisorService {
         });
     }
 
-    private async gatherKhananaData() {
+    private async gatherChatgptData() {
         const indicators = (await this.redis.zrange('indicators:BTCUSDT', 0, 100, 'REV')).map(indicator => JSON.parse(indicator));
 
         if (indicators.length < 60) return;
@@ -409,6 +413,8 @@ export class SupervisorService {
 
         this.claudeData.push(data);
 
+        // @todo: make expensive calculations Promise
+
         const outputX1 = claude.analyze(data);
 
         if (outputX1 !== 'HOLD') {
@@ -450,7 +456,46 @@ export class SupervisorService {
         }
 
         if (outputX5 !== 'HOLD') {
-            this.createTrade('claude-x4', outputX5);
+            this.createTrade('claude-x5', outputX5);
+        }
+
+        const claudeX6 = new TradingStrategyClaudeX6();
+
+        const outputX6 = claudeX6.analyze(data);
+
+        let i = 0;
+
+        for (const signal of outputX6) {
+            i++;
+            if (signal !== 'HOLD') {
+                this.createTrade('claude-x6:' + i, signal);
+            }
+        }
+
+        const claudeX7 = new TradingStrategyClaudeX7();
+
+        const outputX7 = claudeX7.analyze(data);
+
+        let x = 0;
+
+        for (const signal of outputX7) {
+            x++;
+            if (signal !== 'HOLD') {
+                this.createTrade('claude-x7:' + x, signal);
+            }
+        }
+
+        const claudeX8 = new TradingStrategyClaudeX8();
+
+        const outputX8 = claudeX8.analyze(data);
+
+        let z = 0;
+
+        for (const signal of outputX8) {
+            z++;
+            if (signal !== 'HOLD') {
+                this.createTrade('claude-x8:' + z, signal);
+            }
         }
     }
 }

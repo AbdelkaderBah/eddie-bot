@@ -159,6 +159,8 @@ export class SupervisorService {
     }
 
     private async botActivation(event: MarketEvent) {
+        if(this.bots.every(bot => bot.active)) return;
+
         const lastPrices = await this.getLastPrices();
         const lastVolumes = await this.getLastVolumes();
 

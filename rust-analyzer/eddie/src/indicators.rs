@@ -39,17 +39,20 @@ pub struct IndicatorData {
 
 
 
-pub struct Indicators<'a> {
-    redis_client: &'a mut Connection,
+pub struct Indicators {
+    redis_client: Connection,
     symbol: String,
     frequency: String,
 }
 
-impl<'a> Indicators<'a> {
-    pub fn new(client: &'a mut Connection, symbol: &str) -> Result<Self, Box<dyn Error>> {
+impl Indicators {
+    pub fn new(symbol: &str) -> Result<Self, Box<dyn Error>> {
+        let client = Client::open("redis://127.0.0.1:6179")?;
+        let connection = client.get_connection()?;
+
         Ok(Self {
             symbol: symbol.to_string(),
-            redis_client: client,
+            redis_client: connection,
             frequency: "1s".to_string(),
         })
     }

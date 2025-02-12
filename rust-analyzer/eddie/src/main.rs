@@ -108,12 +108,9 @@ fn setup_binance() {
 }
 
 fn collect_indicators() {
-    let client = Client::open("redis://127.0.0.1:6179").unwrap();
-    let mut con = client.get_connection().unwrap();
-
     for symbol in SYMBOLS {
         for frequency in ["1s", "1m"].iter() {
-            let mut indicators = Indicators::new(&mut con, symbol).unwrap();
+            let mut indicators = Indicators::new(symbol).unwrap();
 
             task::spawn(async move {
                 let mut interval = time::interval(Duration::from_secs(match { frequency } {
@@ -125,7 +122,7 @@ fn collect_indicators() {
                 loop {
                     interval.tick().await;
 
-                    println!("{}:{} indicators says: Running...", symbol, frequency);
+                    // println!("{}:{} indicators says: Running...", symbol, frequency);
 
                     indicators.set_frequency(frequency);
                     indicators.run().await.unwrap();

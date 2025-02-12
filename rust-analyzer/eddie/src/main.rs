@@ -1,5 +1,6 @@
 mod callbacks;
 
+use std::collections::HashMap;
 use binance::websockets::*;
 use callbacks::callbacks::Callbacks;
 use redis::{self, Client, Commands};
@@ -11,8 +12,10 @@ use tokio::time::{self, Duration};
 
 mod indicators;
 mod ml_knn_wo_learning;
+mod strategy_builder;
 
 use indicators::Indicators;
+use crate::strategy_builder::{IndicatorConfig, IndicatorData, StrategyBuilder, StrategyConfig};
 
 const SYMBOLS: [&str; 4] = ["BTCUSDT", "BNBUSDT", "BNBBTC", "ETHUSDT"];
 
@@ -40,7 +43,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_binance();
 
     loop {
-        tokio::time::sleep(Duration::from_secs(15)).await;
+        tokio::time::sleep(Duration::from_secs(30)).await;
+
+        let builder = StrategyBuilder::new("redis://127.0.0.1:6179", create_scalping_config()).unwrap();
+        let value = builder.evaluate("indicators:BTCUSDT:1s").unwrap();
+
+        println!("Strategy response: {:?}", &value);
     }
 }
 
@@ -130,4 +138,45 @@ fn collect_indicators() {
             });
         }
     }
+}
+
+fn create_scalping_config() -> StrategyConfig {
+    let mut indicators = HashMap::new();
+
+    indicators.insert("rsi".to_string(), IndicatorConfig {
+        period: 5,
+        lookback: Some(2),
+        threshold: 5.0,  // Triggers at RSI < 25 or > 75
+        weight: 2.0,
+    });
+
+    indicators.insert("macd".to_string(), IndicatorConfig {
+        period: 5,
+        lookback: Some(2),
+        threshold: 0.3,  // Sensitive MACD threshold for quick entries
+        weight: 1.5,
+    });
+
+    indicators.insert("bollinger".to_string(), IndicatorConfig {
+        period: 5,
+        lookback: Some(2),
+        threshold: 0.0005,  // Very tight bands for scalping
+        weight: 2.0,
+    });
+
+    indicators.insert("ml1".to_string(), IndicatorConfig {
+        period: 5,
+        lookback: Some(1),
+        threshold: 0.7,  // High confidence threshold for ML signals
+        weight: 2.5,
+    });
+
+    indicators.insert("ml_volume".to_string(), IndicatorConfig {
+        period: 5,
+        lookback: Some(1),
+        threshold: 0.7,
+        weight: 1.5,
+    });
+
+    StrategyConfig { indicators }
 }

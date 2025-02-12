@@ -49,6 +49,7 @@ import {
 interface Trade {
   id: string;
   botId: string;
+  index: string;
   type: 'LONG' | 'SHORT';
   entryPrice: number;
   exitPrice: number;
@@ -523,7 +524,7 @@ const BotAnalytics: React.FC<BotAnalyticsProps> = ({ bots }) => {
                                 </p>
 
                                 <p className="text-sm text-muted-foreground">
-                                  {new Date(trade.closeTime).toLocaleString()}
+                                  {new Date(trade.closeTime).toLocaleString()} ({trade.index})
                                 </p>
                               </div>
                             </div>

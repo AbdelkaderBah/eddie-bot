@@ -269,21 +269,6 @@ export class SupervisorService {
         }
 
         this.marketBeaterStrategy(outputMarketBeaterStrategy.decision);
-
-        // Store event for history
-        await this.redis.zadd(
-            `eddie-chief-advanced:BTCUSDT`,
-            Date.now(),
-            JSON.stringify({
-                outputKhanana,
-                outputAdvancedS1,
-                outputHelpAfterGod,
-                outputMarketBeaterStrategy,
-                timestamp: Date.now(),
-            })
-        );
-
-        await this.redis.zremrangebyrank(`eddie-chief-advanced:BTCUSDT`, 0, -181);
     }
 
     private async gatherBuyerX1Data() {

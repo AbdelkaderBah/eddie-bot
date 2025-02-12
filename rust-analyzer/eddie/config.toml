@@ -1,0 +1,4 @@
+# WARNING: Do not store production API keys here.
+# Instead, use environment variables to keep sensitive keys safe.
+redis_url = "redis://localhost"
+binance_api_key = ""

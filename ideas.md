@@ -1,5 +1,8 @@
 # Ideas
 
+
+https://www.youtube.com/@MattSacha/shorts
+
 ## 1. Implement Technical analysis.
 
 https://github.com/anandanand84/technicalindicators

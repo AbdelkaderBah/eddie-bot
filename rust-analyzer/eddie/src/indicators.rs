@@ -26,6 +26,8 @@ struct MlOneData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IndicatorData {
+    price_variation: f64,
+    volume: f64,
     ma: f64,
     ema: f64,
     pma: f64,
@@ -43,6 +45,7 @@ pub struct Indicators {
     redis_client: Connection,
     symbol: String,
     frequency: String,
+    total_volume: f64,
 }
 
 impl Indicators {
@@ -54,6 +57,7 @@ impl Indicators {
             symbol: symbol.to_string(),
             redis_client: connection,
             frequency: "1s".to_string(),
+            total_volume: 0.0,
         })
     }
 
@@ -75,10 +79,14 @@ impl Indicators {
         ).unwrap();
 
         let mut prices = Vec::new();
+
+        self.total_volume = 0.0;
+
         for value in values {
             // Parse JSON and extract the "close" price
             if let Ok(data) = serde_json::from_str::<KlineData>(&value) {
                 if let Ok(close) = data.close.parse::<f64>() {
+                    self.total_volume += data.volume.parse::<f64>().unwrap();
                     prices.push(close);
                 }
             }
@@ -144,7 +152,11 @@ impl Indicators {
 
         let timestamp = Utc::now().timestamp();
 
+        let price_variation = (prices[0] - prices[prices.len() - 1]) / prices[prices.len() - 1] * 100.0;
+
         let values = IndicatorData {
+            price_variation,
+            volume: self.total_volume,
             ma,
             bollinger_bands,
             ema,

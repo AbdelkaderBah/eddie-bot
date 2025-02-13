@@ -2,8 +2,8 @@ use crate::callbacks::callbacks::DepthData;
 use crate::ml_knn_wo_learning;
 use crate::ml_knn_wo_learning::{run_strategy, MarketData};
 use chrono::{DateTime, Utc};
-use redis::{Client, Connection};
 use redis::Commands;
+use redis::{Client, Connection};
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
@@ -39,8 +39,6 @@ pub struct IndicatorData {
     timestamp: i64,
 }
 
-
-
 pub struct Indicators {
     redis_client: Connection,
     symbol: String,
@@ -72,11 +70,13 @@ impl Indicators {
             start = now - (60 * 60 * 1000);
         }
 
-        let values: Vec<String> = con.zrangebyscore(
-            format!("klines:{}:{}", self.symbol, self.frequency),
-            start,
-            now,
-        ).unwrap();
+        let values: Vec<String> = con
+            .zrangebyscore(
+                format!("klines:{}:{}", self.symbol, self.frequency),
+                start,
+                now,
+            )
+            .unwrap();
 
         let mut prices = Vec::new();
 
@@ -104,7 +104,12 @@ impl Indicators {
         let prices = self.fetch_prices().await?;
 
         if prices.len() < 20 {
-            println!("{}:{} indicators says: Prices not met... {}", self.symbol, self.frequency, prices.len());
+            println!(
+                "{}:{} indicators says: Prices not met... {}",
+                self.symbol,
+                self.frequency,
+                prices.len()
+            );
 
             return Ok(());
         }
@@ -152,7 +157,8 @@ impl Indicators {
 
         let timestamp = Utc::now().timestamp();
 
-        let price_variation = (prices[0] - prices[prices.len() - 1]) / prices[prices.len() - 1] * 100.0;
+        let price_variation =
+            (prices[0] - prices[prices.len() - 1]) / prices[prices.len() - 1] * 100.0;
 
         let values = IndicatorData {
             price_variation,
@@ -165,7 +171,7 @@ impl Indicators {
             macd,
             ml1,
             ml_volume,
-            timestamp
+            timestamp,
         };
 
         let value = serde_json::to_string(&values).unwrap(); // Serialize struct to JSON
@@ -175,7 +181,11 @@ impl Indicators {
         let mut con = &mut self.redis_client;
 
         let _: () = con
-            .zadd(format!("indicators:{}:{}", self.symbol, self.frequency), value, now)
+            .zadd(
+                format!("indicators:{}:{}", self.symbol, self.frequency),
+                value,
+                now,
+            )
             .unwrap();
 
         Ok(())
@@ -185,7 +195,11 @@ impl Indicators {
         let mut con = &mut self.redis_client;
 
         let prices: Vec<String> = con
-            .zrange(format!("klines:{}:{}", self.symbol, self.frequency), -100, -1)
+            .zrange(
+                format!("klines:{}:{}", self.symbol, self.frequency),
+                -100,
+                -1,
+            )
             .unwrap();
 
         // Let's group prices by close_time

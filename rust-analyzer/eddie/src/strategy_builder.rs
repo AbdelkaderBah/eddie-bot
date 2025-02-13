@@ -61,24 +61,53 @@ impl StrategyBuilder {
         let mut sell_score = 0.0;
 
         for (indicator, config) in &self.config.indicators {
-            let data = self.get_indicator_data(&mut conn, base_key, config.period, config.lookback)?;
+            let data =
+                self.get_indicator_data(&mut conn, base_key, config.period, config.lookback)?;
             match indicator.as_str() {
                 "ma" => self.evaluate_ma(&data, config, &mut buy_score, &mut sell_score),
                 "ema" => self.evaluate_ema(&data, config, &mut buy_score, &mut sell_score),
                 "pma" => self.evaluate_pma(&data, config, &mut buy_score, &mut sell_score),
                 "rsi" => self.evaluate_rsi(&data, config, &mut buy_score, &mut sell_score),
                 "macd" => self.evaluate_macd(&data, config, &mut buy_score, &mut sell_score),
-                "ml1" => self.evaluate_ml(&data.iter().map(|item| {
-                    MLSignals { hold: item.ml1.hold, buy: item.ml1.buy, sell: item.ml1.sell }
-                }).reduce(|item, prev| {
-                    MLSignals { hold: item.hold + prev.hold, buy: item.buy + prev.buy, sell: item.sell + prev.sell }
-                }).unwrap(), config, &mut buy_score, &mut sell_score),
-                "ml_volume" => self.evaluate_ml(&data.iter().map(|item| {
-                    MLSignals { hold: item.ml_volume.hold, buy: item.ml_volume.buy, sell: item.ml_volume.sell }
-                }).reduce(|item, prev| {
-                    MLSignals { hold: item.hold + prev.hold, buy: item.buy + prev.buy, sell: item.sell + prev.sell }
-                }).unwrap(), config, &mut buy_score, &mut sell_score),
-                "bollinger" => self.evaluate_bollinger(&data, config, &mut buy_score, &mut sell_score),
+                "ml1" => self.evaluate_ml(
+                    &data
+                        .iter()
+                        .map(|item| MLSignals {
+                            hold: item.ml1.hold,
+                            buy: item.ml1.buy,
+                            sell: item.ml1.sell,
+                        })
+                        .reduce(|item, prev| MLSignals {
+                            hold: item.hold + prev.hold,
+                            buy: item.buy + prev.buy,
+                            sell: item.sell + prev.sell,
+                        })
+                        .unwrap(),
+                    config,
+                    &mut buy_score,
+                    &mut sell_score,
+                ),
+                "ml_volume" => self.evaluate_ml(
+                    &data
+                        .iter()
+                        .map(|item| MLSignals {
+                            hold: item.ml_volume.hold,
+                            buy: item.ml_volume.buy,
+                            sell: item.ml_volume.sell,
+                        })
+                        .reduce(|item, prev| MLSignals {
+                            hold: item.hold + prev.hold,
+                            buy: item.buy + prev.buy,
+                            sell: item.sell + prev.sell,
+                        })
+                        .unwrap(),
+                    config,
+                    &mut buy_score,
+                    &mut sell_score,
+                ),
+                "bollinger" => {
+                    self.evaluate_bollinger(&data, config, &mut buy_score, &mut sell_score)
+                }
                 _ => {}
             }
         }
@@ -86,8 +115,13 @@ impl StrategyBuilder {
         Ok(self.generate_signal(buy_score, sell_score))
     }
 
-    fn get_indicator_data(&self, conn: &mut redis::Connection, base_key: &str, period: i32, lookback: Option<i32>)
-                          -> Result<Vec<IndicatorData>, Box<dyn std::error::Error>> {
+    fn get_indicator_data(
+        &self,
+        conn: &mut redis::Connection,
+        base_key: &str,
+        period: i32,
+        lookback: Option<i32>,
+    ) -> Result<Vec<IndicatorData>, Box<dyn std::error::Error>> {
         let mut data = Vec::new();
         let lookback = lookback.unwrap_or(1);
         let range_end = (period * lookback) as isize - 1;
@@ -106,8 +140,13 @@ impl StrategyBuilder {
         Ok(data)
     }
 
-    fn evaluate_ma(&self, data: &[IndicatorData], config: &IndicatorConfig,
-                   buy_score: &mut f64, sell_score: &mut f64) {
+    fn evaluate_ma(
+        &self,
+        data: &[IndicatorData],
+        config: &IndicatorConfig,
+        buy_score: &mut f64,
+        sell_score: &mut f64,
+    ) {
         if data.len() < 2 {
             return;
         }
@@ -124,8 +163,13 @@ impl StrategyBuilder {
         }
     }
 
-    fn evaluate_pma(&self, data: &[IndicatorData], config: &IndicatorConfig,
-                    buy_score: &mut f64, sell_score: &mut f64) {
+    fn evaluate_pma(
+        &self,
+        data: &[IndicatorData],
+        config: &IndicatorConfig,
+        buy_score: &mut f64,
+        sell_score: &mut f64,
+    ) {
         if let Some(current) = data.first() {
             if current.pma > current.ma * (1.0 + config.threshold) {
                 *buy_score += config.weight;
@@ -135,8 +179,13 @@ impl StrategyBuilder {
         }
     }
 
-    fn evaluate_ema(&self, data: &[IndicatorData], config: &IndicatorConfig,
-                    buy_score: &mut f64, sell_score: &mut f64) {
+    fn evaluate_ema(
+        &self,
+        data: &[IndicatorData],
+        config: &IndicatorConfig,
+        buy_score: &mut f64,
+        sell_score: &mut f64,
+    ) {
         if let Some(current) = data.first() {
             if current.ema > current.ma * (1.0 + config.threshold) {
                 *buy_score += config.weight;
@@ -146,11 +195,17 @@ impl StrategyBuilder {
         }
     }
 
-    fn evaluate_rsi(&self, data: &[IndicatorData], config: &IndicatorConfig,
-                    buy_score: &mut f64, sell_score: &mut f64) {
+    fn evaluate_rsi(
+        &self,
+        data: &[IndicatorData],
+        config: &IndicatorConfig,
+        buy_score: &mut f64,
+        sell_score: &mut f64,
+    ) {
         if let Some(current) = data.first() {
             if let Some(rsi) = current.rsi.last() {
-                let prev_rsi = data.get(1)
+                let prev_rsi = data
+                    .get(1)
                     .and_then(|d| d.rsi.last())
                     .copied()
                     .unwrap_or(*rsi);
@@ -166,8 +221,13 @@ impl StrategyBuilder {
         }
     }
 
-    fn evaluate_macd(&self, data: &[IndicatorData], config: &IndicatorConfig,
-                     buy_score: &mut f64, sell_score: &mut f64) {
+    fn evaluate_macd(
+        &self,
+        data: &[IndicatorData],
+        config: &IndicatorConfig,
+        buy_score: &mut f64,
+        sell_score: &mut f64,
+    ) {
         if let Some(current) = data.first() {
             if let Some(macd) = current.macd.last() {
                 if *macd > config.threshold {
@@ -179,8 +239,13 @@ impl StrategyBuilder {
         }
     }
 
-    fn evaluate_ml(&self, signals: &MLSignals, config: &IndicatorConfig,
-                   buy_score: &mut f64, sell_score: &mut f64) {
+    fn evaluate_ml(
+        &self,
+        signals: &MLSignals,
+        config: &IndicatorConfig,
+        buy_score: &mut f64,
+        sell_score: &mut f64,
+    ) {
         let total = signals.buy + signals.sell + signals.hold;
         if total == 0 {
             return;
@@ -199,9 +264,13 @@ impl StrategyBuilder {
         }
     }
 
-
-    fn evaluate_bollinger(&self, data: &[IndicatorData], config: &IndicatorConfig,
-                          buy_score: &mut f64, sell_score: &mut f64) {
+    fn evaluate_bollinger(
+        &self,
+        data: &[IndicatorData],
+        config: &IndicatorConfig,
+        buy_score: &mut f64,
+        sell_score: &mut f64,
+    ) {
         if let Some(current) = data.first() {
             if let Some(latest_band) = current.bollinger_bands.last() {
                 if latest_band.len() == 3 {
@@ -236,7 +305,9 @@ pub fn load_strategy_config(json_str: &str) -> Result<StrategyConfig, Box<dyn st
     Ok(config)
 }
 
-pub fn load_strategy_config_from_file(path: &str) -> Result<StrategyConfig, Box<dyn std::error::Error>> {
+pub fn load_strategy_config_from_file(
+    path: &str,
+) -> Result<StrategyConfig, Box<dyn std::error::Error>> {
     let json_str = std::fs::read_to_string(path)?;
     load_strategy_config(&json_str)
 }
@@ -269,12 +340,15 @@ mod tests {
     #[test]
     fn test_strategy_builder() {
         let mut config = HashMap::new();
-        config.insert("ma".to_string(), IndicatorConfig {
-            period: 14,
-            lookback: Some(3),
-            threshold: 0.001,
-            weight: 1.0,
-        });
+        config.insert(
+            "ma".to_string(),
+            IndicatorConfig {
+                period: 14,
+                lookback: Some(3),
+                threshold: 0.001,
+                weight: 1.0,
+            },
+        );
 
         let strategy_config = StrategyConfig { indicators: config };
         let builder = StrategyBuilder::new("redis://127.0.0.1/", strategy_config).unwrap();

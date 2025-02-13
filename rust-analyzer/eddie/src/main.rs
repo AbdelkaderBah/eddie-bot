@@ -57,6 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn purge_market_data(client: &Client) {
     let mut con = client.get_connection().unwrap();
 
+    // 14 days of information
     const LENGTH_LIMIT: isize = -(86400 * 14);
 
     // Spawn a background task that runs every 10 seconds

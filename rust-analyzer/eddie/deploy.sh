@@ -6,7 +6,6 @@ APP_DIR=${1:-$(pwd)}
 echo "Using application directory: $APP_DIR"
 
 # Export variable for Supervisor
-
 export MY_APP_DIR="$APP_DIR"
 
 # Change to your application's directory
@@ -23,6 +22,8 @@ cargo build --release
 # Optionally, copy the new binary to a known location.
 # Adjust the binary name and destination as needed.
 #echo "Deploying new binary..."
+sudo supervisorctl stop eddie
+
 cp target/release/eddie /usr/local/bin/eddie
 
 # Restart the application via Supervisor

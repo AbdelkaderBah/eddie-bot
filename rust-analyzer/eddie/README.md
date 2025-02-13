@@ -9,6 +9,7 @@ cp eddie.conf /etc/supervisor/conf.d/eddie.conf
 
 ```bash
 chmod +x deploy.sh
+./deploy.sh
 ```
 
 ## Helpful commands

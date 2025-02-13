@@ -25,8 +25,13 @@ cargo build --release
 #echo "Deploying new binary..."
 #sudo cp target/release/my_app /usr/local/bin/my_app
 
+echo "export MY_APP_DIR=\"$APP_DIR\"" | sudo tee /etc/profile.d/eddie.sh > /dev/null
+source /etc/profile.d/eddie.sh  # Apply changes immediately
+
 # Restart the application via Supervisor
 echo "Restarting application via Supervisor..."
+sudo supervisorctl reread
+sudo supervisorctl update
 sudo supervisorctl restart eddie
 
 echo "Deployment complete!"

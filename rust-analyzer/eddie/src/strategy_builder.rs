@@ -90,14 +90,17 @@ impl StrategyBuilder {
                           -> Result<Vec<IndicatorData>, Box<dyn std::error::Error>> {
         let mut data = Vec::new();
         let lookback = lookback.unwrap_or(1);
+        let range_end = (period * lookback) as isize - 1;
 
-        let key = format!("{}", base_key);
+        // Get data based on period intervals
+        let value: Vec<String> = conn.zrevrange(base_key, 0, range_end)?;
 
-        let value: Vec<String> = conn.zrevrange(&key, 0, lookback as isize)?;
-
-        for i in 0..lookback {
-            let indicator_data: IndicatorData = serde_json::from_str(&value[i as usize])?;
-            data.push(indicator_data);
+        // Process data in period chunks
+        for chunk in value.chunks(period as usize) {
+            if let Some(latest) = chunk.first() {
+                let indicator_data: IndicatorData = serde_json::from_str(latest)?;
+                data.push(indicator_data);
+            }
         }
 
         Ok(data)
@@ -105,10 +108,28 @@ impl StrategyBuilder {
 
     fn evaluate_ma(&self, data: &[IndicatorData], config: &IndicatorConfig,
                    buy_score: &mut f64, sell_score: &mut f64) {
+        if data.len() < 2 {
+            return;
+        }
+
+        let current = &data[0];
+        let previous = &data[1];
+
+        let ma_trend = (current.ma - previous.ma) / previous.ma;
+
+        if ma_trend > config.threshold {
+            *buy_score += config.weight;
+        } else if ma_trend < -config.threshold {
+            *sell_score += config.weight;
+        }
+    }
+
+    fn evaluate_pma(&self, data: &[IndicatorData], config: &IndicatorConfig,
+                    buy_score: &mut f64, sell_score: &mut f64) {
         if let Some(current) = data.first() {
-            if current.ma > current.ema * (1.0 + config.threshold) {
+            if current.pma > current.ma * (1.0 + config.threshold) {
                 *buy_score += config.weight;
-            } else if current.ma < current.ema * (1.0 - config.threshold) {
+            } else if current.pma < current.ma * (1.0 - config.threshold) {
                 *sell_score += config.weight;
             }
         }
@@ -125,25 +146,21 @@ impl StrategyBuilder {
         }
     }
 
-    fn evaluate_pma(&self, data: &[IndicatorData], config: &IndicatorConfig,
-                    buy_score: &mut f64, sell_score: &mut f64) {
-        if let Some(current) = data.first() {
-            if current.pma > current.ma * (1.0 + config.threshold) {
-                *buy_score += config.weight;
-            } else if current.pma < current.ma * (1.0 - config.threshold) {
-                *sell_score += config.weight;
-            }
-        }
-    }
-
     fn evaluate_rsi(&self, data: &[IndicatorData], config: &IndicatorConfig,
                     buy_score: &mut f64, sell_score: &mut f64) {
         if let Some(current) = data.first() {
             if let Some(rsi) = current.rsi.last() {
-                if *rsi < 30.0 - config.threshold {
-                    *buy_score += config.weight;
-                } else if *rsi > 70.0 + config.threshold {
-                    *sell_score += config.weight;
+                let prev_rsi = data.get(1)
+                    .and_then(|d| d.rsi.last())
+                    .copied()
+                    .unwrap_or(*rsi);
+
+                let rsi_trend = *rsi - prev_rsi;
+
+                if *rsi < 30.0 && rsi_trend > 0.0 {
+                    *buy_score += config.weight * 1.5; // Amplify oversold conditions
+                } else if *rsi > 70.0 && rsi_trend < 0.0 {
+                    *sell_score += config.weight * 1.5;
                 }
             }
         }
@@ -171,13 +188,17 @@ impl StrategyBuilder {
 
         let buy_ratio = signals.buy as f64 / total as f64;
         let sell_ratio = signals.sell as f64 / total as f64;
+        let consensus_strength = (buy_ratio - sell_ratio).abs();
+
+        let adjusted_weight = config.weight * (1.0 + consensus_strength);
 
         if buy_ratio > config.threshold {
-            *buy_score += config.weight;
+            *buy_score += adjusted_weight;
         } else if sell_ratio > config.threshold {
-            *sell_score += config.weight;
+            *sell_score += adjusted_weight;
         }
     }
+
 
     fn evaluate_bollinger(&self, data: &[IndicatorData], config: &IndicatorConfig,
                           buy_score: &mut f64, sell_score: &mut f64) {
@@ -198,11 +219,11 @@ impl StrategyBuilder {
     }
 
     fn generate_signal(&self, buy_score: f64, sell_score: f64) -> Signal {
-        let threshold = 1.0;
+        let adaptive_threshold = 1.0 + (buy_score.max(sell_score) * 0.1);
 
-        if buy_score > threshold && buy_score > sell_score {
+        if buy_score > adaptive_threshold && buy_score > sell_score * 1.2 {
             Signal::BUY
-        } else if sell_score > threshold && sell_score > buy_score {
+        } else if sell_score > adaptive_threshold && sell_score > buy_score * 1.2 {
             Signal::SELL
         } else {
             Signal::HOLD
@@ -210,9 +231,40 @@ impl StrategyBuilder {
     }
 }
 
+pub fn load_strategy_config(json_str: &str) -> Result<StrategyConfig, Box<dyn std::error::Error>> {
+    let config: StrategyConfig = serde_json::from_str(json_str)?;
+    Ok(config)
+}
+
+pub fn load_strategy_config_from_file(path: &str) -> Result<StrategyConfig, Box<dyn std::error::Error>> {
+    let json_str = std::fs::read_to_string(path)?;
+    load_strategy_config(&json_str)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_load_strategy_config() {
+        let json = r#"{
+            "indicators": {
+                "rsi": {
+                    "period": 5,
+                    "lookback": 3,
+                    "threshold": 3.0,
+                    "weight": 2.5
+                }
+            }
+        }"#;
+
+        let config = load_strategy_config(json).unwrap();
+        let rsi_config = config.indicators.get("rsi").unwrap();
+        assert_eq!(rsi_config.period, 5);
+        assert_eq!(rsi_config.lookback, Some(3));
+        assert_eq!(rsi_config.threshold, 3.0);
+        assert_eq!(rsi_config.weight, 2.5);
+    }
 
     #[test]
     fn test_strategy_builder() {

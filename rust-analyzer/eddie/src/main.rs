@@ -1,10 +1,8 @@
 mod callbacks;
 
-use std::collections::HashMap;
 use binance::websockets::*;
 use callbacks::callbacks::Callbacks;
 use redis::{self, Client, Commands};
-use std::ffi::c_void;
 use std::sync::atomic::AtomicBool;
 use tokio;
 use tokio::task;
@@ -13,11 +11,9 @@ use tokio::time::{self, Duration};
 mod indicators;
 mod ml_knn_wo_learning;
 mod strategy_builder;
-
 use indicators::Indicators;
-use crate::strategy_builder::{IndicatorConfig, IndicatorData, StrategyBuilder, StrategyConfig};
 
-const SYMBOLS: [&str; 4] = ["BTCUSDT", "BNBUSDT", "BNBBTC", "ETHUSDT"];
+const SYMBOLS: [&str; 3] = ["BTCUSDT", "ETHUSDT", "ETHBTC"];
 
 fn endpoints() -> Vec<String> {
     SYMBOLS
@@ -45,15 +41,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         tokio::time::sleep(Duration::from_secs(30)).await;
 
-        let builder = StrategyBuilder::new("redis://127.0.0.1:6179", create_scalping_config()).unwrap();
-        let value = builder.evaluate("indicators:BTCUSDT:1s").unwrap();
-
-        println!("Strategy response: {:?}", &value);
+         // let mut conn = client.get_connection().unwrap();
+        // let value: String = conn.hget("strategies", "scalping_low_risk").unwrap();
+        //
+        // let builder = StrategyBuilder::new(
+        //     "redis://127.0.0.1:6179", strategy_builder::load_strategy_config(&*value).unwrap()
+        // ).unwrap();
+        //
+        // let value = builder.evaluate("indicators:BTCUSDT:1s").unwrap();
+        //
+        // println!("Strategy response: {:?}", &value);
     }
 }
 
 fn purge_market_data(client: &Client) {
     let mut con = client.get_connection().unwrap();
+
+    const LENGTH_LIMIT: isize = -2500;
 
     // Spawn a background task that runs every 10 seconds
     task::spawn(async move {
@@ -63,19 +67,23 @@ fn purge_market_data(client: &Client) {
 
             for symbol in SYMBOLS {
                 let _: () = con
-                    .zremrangebyrank(format!("depths:{}", symbol), 0, -500)
+                    .zremrangebyrank(format!("depths:{}", symbol), 0, LENGTH_LIMIT)
                     .unwrap();
+
                 let _: () = con
-                    .zremrangebyrank(format!("klines:{}:1s", symbol), 0, -500)
+                    .zremrangebyrank(format!("klines:{}:1s", symbol), 0, LENGTH_LIMIT)
                     .unwrap();
+
                 let _: () = con
-                    .zremrangebyrank(format!("klines:{}:1m", symbol), 0, -500)
+                    .zremrangebyrank(format!("klines:{}:1m", symbol), 0, LENGTH_LIMIT)
                     .unwrap();
+
                 let _: () = con
-                    .zremrangebyrank(format!("indicators:{}:1s", symbol), 0, -500)
+                    .zremrangebyrank(format!("indicators:{}:1s", symbol), 0, LENGTH_LIMIT)
                     .unwrap();
+
                 let _: () = con
-                    .zremrangebyrank(format!("indicators:{}:1m", symbol), 0, -500)
+                    .zremrangebyrank(format!("indicators:{}:1m", symbol), 0, LENGTH_LIMIT)
                     .unwrap();
             }
         }
@@ -138,45 +146,4 @@ fn collect_indicators() {
             });
         }
     }
-}
-
-fn create_scalping_config() -> StrategyConfig {
-    let mut indicators = HashMap::new();
-
-    indicators.insert("rsi".to_string(), IndicatorConfig {
-        period: 5,
-        lookback: Some(2),
-        threshold: 5.0,  // Triggers at RSI < 25 or > 75
-        weight: 2.0,
-    });
-
-    indicators.insert("macd".to_string(), IndicatorConfig {
-        period: 5,
-        lookback: Some(2),
-        threshold: 0.3,  // Sensitive MACD threshold for quick entries
-        weight: 1.5,
-    });
-
-    indicators.insert("bollinger".to_string(), IndicatorConfig {
-        period: 5,
-        lookback: Some(2),
-        threshold: 0.0005,  // Very tight bands for scalping
-        weight: 2.0,
-    });
-
-    indicators.insert("ml1".to_string(), IndicatorConfig {
-        period: 5,
-        lookback: Some(1),
-        threshold: 0.7,  // High confidence threshold for ML signals
-        weight: 2.5,
-    });
-
-    indicators.insert("ml_volume".to_string(), IndicatorConfig {
-        period: 5,
-        lookback: Some(1),
-        threshold: 0.7,
-        weight: 1.5,
-    });
-
-    StrategyConfig { indicators }
 }

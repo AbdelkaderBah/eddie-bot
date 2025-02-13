@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "indicators": {
+      "type": "object",
+      "properties": {
+        "rsi": {
+          "description": "RSI (Relative Strength Index) - Value Type: floating point, Value Range: 0-100, Default Signals: oversold<30, overbought>70",
+          "$ref": "#/definitions/indicator"
+        },
+        "macd": {
+          "description": "MACD - Value Type: floating point, represents momentum strength and direction",
+          "$ref": "#/definitions/indicator"
+        },
+        "bollinger": {
+          "description": "Bollinger Bands - Value Type: [lower, middle, upper] bands as percentage deviations",
+          "$ref": "#/definitions/indicator"
+        },
+        "ma": {
+          "description": "Moving Average - Value Type: price average, same unit as asset price",
+          "$ref": "#/definitions/indicator"
+        },
+        "ema": {
+          "description": "EMA - Value Type: weighted price average, same unit as asset price",
+          "$ref": "#/definitions/indicator"
+        },
+        "ml1": {
+          "description": "ML Price - Value Type: ratio counts {buy, sell, hold}, Range: 0.0-1.0",
+          "$ref": "#/definitions/indicator"
+        },
+        "ml_volume": {
+          "description": "ML Volume - Value Type: ratio counts {buy, sell, hold}, Range: 0.0-1.0",
+          "$ref": "#/definitions/indicator"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "indicator": {
+      "type": "object",
+      "properties": {
+        "period": {
+          "type": "integer",
+          "description": "Data points for calculation. Value Type: positive integer, Range: 1-∞",
+          "minimum": 1
+        },
+        "lookback": {
+          "type": "integer",
+          "description": "Historical points to analyze. Value Type: positive integer, Range: 1-∞",
+          "minimum": 1
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Signal trigger value. Value Type: float, Range by indicator type:\n- RSI: 0-30 (buy), 70-100 (sell)\n- MACD: typically 0.1-1.0\n- Bollinger: 0.0001-0.01 (price deviation)\n- MA/EMA: 0.0001-0.01 (price change)\n- ML: 0.5-1.0 (confidence)",
+          "minimum": 0
+        },
+        "weight": {
+          "type": "number",
+          "description": "Signal importance. Value Type: float, Recommended Range: 0.5-3.0",
+          "minimum": 0
+        }
+      },
+      "required": ["period", "lookback", "threshold", "weight"]
+    }
+  }
+}

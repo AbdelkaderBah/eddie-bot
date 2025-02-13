@@ -1,6 +1,18 @@
 # Eddie BOTs
 
+## Setup
+```bash
+cp eddie.conf /etc/supervisor/conf.d/eddie.conf
+```
+
+## Deployment
+
+```bash
+chmod +x deploy.sh
+```
+
 ## Helpful commands
+
 
 
 ```bash

@@ -23,10 +23,7 @@ cargo build --release
 # Optionally, copy the new binary to a known location.
 # Adjust the binary name and destination as needed.
 #echo "Deploying new binary..."
-#sudo cp target/release/my_app /usr/local/bin/my_app
-
-echo "export MY_APP_DIR=\"$APP_DIR\"" | sudo tee /etc/profile.d/eddie.sh > /dev/null
-source /etc/profile.d/eddie.sh  # Apply changes immediately
+cp target/release/eddie /usr/local/bin/eddie
 
 # Restart the application via Supervisor
 echo "Restarting application via Supervisor..."

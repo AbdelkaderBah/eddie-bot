@@ -36,6 +36,8 @@ async fn main() {
 fn setup_binance() {
     let keep_running = AtomicBool::new(true); // Used to control the event loop
 
+    println!("VHAKM: Starting the trading bot...");
+
     let mut vhakms = vec![
         simple_trading::SimpleTrading::new(
             "BTCUSDT:BIRTH".to_string(),

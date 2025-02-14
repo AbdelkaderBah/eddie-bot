@@ -191,14 +191,14 @@ impl SimpleTrading {
                 .redis
                 .get_connection()
                 .unwrap()
-                .zadd(
-                    format!("trades:debile:{}", self.symbol.to_string()),
+                .lpush(
+                    "trades:history".to_string(),
                     format!(
-                        "Total Profits: {:.3}, Total Losses {:.3}, Timestamp: {}",
+                        "S:{}, P:{:.1}, L{:.1}, T:{}",
+                        self.symbol.to_string(),
                         self.profits, self.losses,
                         score,
-                    ),
-                    score
+                    )
                 )
                 .unwrap();
 

@@ -19,6 +19,10 @@ impl IndicatorPeriods {
             long,
         }
     }
+
+    pub fn all_periods(&self) -> Vec<usize> {
+        vec![self.ultra_short, self.short, self.medium, self.long]
+    }
 }
 
 pub struct TechnicalIndicatorPeriods {
@@ -32,8 +36,8 @@ pub struct TechnicalIndicatorPeriods {
 impl TechnicalIndicatorPeriods {
     pub fn new() -> Self {
         Self {
-            price_variation: IndicatorPeriods::new("price_variation".to_string(), 7, 14, 21, 28),
-            volume_variation: IndicatorPeriods::new("volume_variation".to_string(), 7, 14, 21, 28),
+            price_variation: IndicatorPeriods::new("price_variation".to_string(), 2, 7, 14, 28),
+            volume_variation: IndicatorPeriods::new("volume_variation".to_string(), 2, 7, 14, 28),
             rsi: IndicatorPeriods::new("rsi".to_string(), 7, 14, 21, 28),
             ema: IndicatorPeriods::new("ema".to_string(), 5, 10, 20, 50),
             sma: IndicatorPeriods::new("sma".to_string(), 5, 10, 20, 50),

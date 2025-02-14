@@ -1,8 +1,15 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use crate::processors::binance_hooks::binance_hooks::Hooks;
 use binance::websockets::*;
 use redis::{self, Client, Commands};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
+use binance::futures::account::FuturesAccount;
+use binance::api::Binance;
+use binance::config::Config;
+use binance::general::General;
 use tokio;
 use tokio::task;
 use tokio::time::{self, Duration};
@@ -22,116 +29,63 @@ fn endpoints() -> Vec<String> {
         .collect::<Vec<String>>()
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    setup_binance();
+// #[tokio::main]
+fn main() {
+    setup_binance_trades().unwrap();
 
-    loop {
-        tokio::time::sleep(Duration::from_secs(30)).await;
-    }
+    // setup_binance();
+
+    // loop {
+    //     tokio::time::sleep(Duration::from_secs(30)).await;
+    // }
 }
 
-const TAKE_PROFIT_PERCENTAGE: f64 = 0.002;
-// represented in US$.
-const STOP_LOSS_VALUE: f64 = 5.0;
+fn setup_binance_trades() -> Result<(), Box<dyn std::error::Error>> {
+    // let api_key = Some("RHibjd8tUPgykKsKDacWY93o6cxJQtGdCqbphCGWG5htevMcNQbUg5Bp5c1vfZpQ".into());
+    // let secret_key = Some("jhb8mgc6KC0q1D7ZMUagog6VsZ4PVn4CcwsyrQ8hnsQCZUxhSzMUmaY0BySb7WNk".into());
+
+    // testnet credentials
+    // let api_key = Some("PX4tYSb6nBGMC87oNUWvFgAJxj7fAlfHysMB0ZLG2aN3yvGTI1sIxGK9oUHyhxGR".into());
+    // let secret_key = Some("aFhUuyDJJPifrlSDz5WWTYuU0UZ839RGP3Sm62t8u5YSLFPYyT5qrpa8FG1X8Jtz".into());
+
+    // testnet credentials (Futures)
+    let api_key = Some("56d2f4cb15d3adc743f493ca31d588457ec80af37fb27126c8884bdf6df6124c".into());
+    let secret_key = Some("5c3e116b5e49ada0ef08aa56334c9e1f46b739bc9d669f1ba3c1ea52ca30f31f".into());
+
+
+    let config = Config::default().set_rest_api_endpoint("https://testnet.binancefuture.com")
+        .set_futures_rest_api_endpoint("https://testnet.binancefuture.com");
+    // let config = Config::default().set_rest_api_endpoint("https://testnet.binance.vision");
+    // let config = Config::default().set_rest_api_endpoint("https://fapi.binance.com");
+
+    let account: FuturesAccount = Binance::new_with_config(api_key, secret_key, &config);
+
+    let redis = Client::open("redis://127.0.0.1:6179")?;
+
+    redis.get_connection().unwrap().hset("test_key", "test_value", "AAA").unwrap();
+
+    match account.account_balance() {
+        Ok(answer) => println!("{:?}", answer),
+        Err(e) => println!("Error: {:?}", e),
+    }
+
+    // match account.get_open_orders("BTCUSDT") {
+    //     Ok(answer) => println!("{:?}", answer),
+    //     Err(e) => println!("Error: {:?}", e),
+    // }
+
+    Ok(())
+}
 
 fn setup_binance() {
     let keep_running = AtomicBool::new(true); // Used to control the event loop
 
-    const WATCH_MOVEMENT_PERCENTAGE: f64 = 0.02;
-
-    let mut watch_price: f64 = 0.0;
-    let mut last_price: f64 = 0.0;
-
-    let mut stop_loss: f64 = 0.0;
-    let mut take_profit: f64 = 0.0;
-
-    let mut trade_active: bool = false;
-    let mut buy_price: f64 = 0.0;
-    let mut sell_price: f64 = 0.0;
+    let mut simple_trading = simple_trading::SimpleTrading::new("BTCUSDT".to_string(), 0.0);
 
     let mut web_socket = WebSockets::new(|event: WebsocketEvent| {
         match event {
             WebsocketEvent::Kline(event) => {
-                let current_price: f64 = event.kline.close.parse().unwrap();
-
-                // println!("Current price: {}", current_price);
-
-                // check for price movement when there is no active trade.
-                if last_price != 0.0 && (buy_price == 0.0 && sell_price == 0.0) {
-                    let price_diff = watch_price - last_price;
-                    let price_diff_percentage = (price_diff / last_price) * 100.0;
-
-                    if price_diff_percentage.abs() > WATCH_MOVEMENT_PERCENTAGE {
-                        if price_diff_percentage > 0.0 {
-                            println!("BUY TIME!! {}, {}%", current_price, price_diff_percentage);
-
-                            let [p, s, t] = buy(current_price);
-
-                            buy_price = p;
-                            stop_loss = s;
-                            take_profit = t;
-                        } else {
-                            println!("SELL TIME!! {}, {}%", current_price, price_diff_percentage);
-                            let [p, s, t] = sell(current_price);
-
-                            sell_price = p;
-                            stop_loss = s;
-                            take_profit = t;
-                        }
-                    }
-                }
-
-
-                // check when there is a buy trade
-                if buy_price != 0.0 {
-                    if trade_active == false {
-                        trade_active = true;
-                        buy_price = current_price;
-                    }
-
-                    if current_price >= take_profit {
-                        println!("Take profit hit: {}, {}", current_price, take_profit);
-                        println!("We have made: {}$", take_profit - buy_price);
-                        buy_price = 0.0;
-                        stop_loss = 0.0;
-                        take_profit = 0.0;
-                    } else if current_price <= stop_loss {
-                        println!("Stop loss hit: {}, {}", current_price, stop_loss);
-                        println!("We have lost: {}$", stop_loss - buy_price);
-                        buy_price = 0.0;
-                        stop_loss = 0.0;
-                        take_profit = 0.0;
-                    }
-                }
-
-                // check when there is a buy trade
-                if sell_price != 0.0 {
-                    if trade_active == false {
-                        trade_active = true;
-                        sell_price = current_price;
-                    }
-
-                    if current_price <= take_profit {
-                        println!("Take profit hit: {}, {}", current_price, take_profit);
-                        println!("We have made: {}$", sell_price - take_profit);
-                        sell_price = 0.0;
-                        stop_loss = 0.0;
-                        take_profit = 0.0;
-                    } else if current_price >= stop_loss {
-                        println!("Stop loss hit: {}, {}", current_price, stop_loss);
-                        println!("We have lost: {}$", sell_price - stop_loss);
-                        sell_price = 0.0;
-                        stop_loss = 0.0;
-                        take_profit = 0.0;
-                    }
-                }
-
-                if watch_price == 0.0 && (buy_price == 0.0 && sell_price == 0.0) {
-                    watch_price = current_price;
-                }
-
-                last_price = current_price;
+                simple_trading.run(event.kline.close.parse::<f64>().unwrap());
             }
             _ => {
                 println!("Received event: {:?}", event);
@@ -152,18 +106,4 @@ fn setup_binance() {
     }
 
     web_socket.disconnect().unwrap();
-}
-
-fn buy(current_price: f64) -> [f64; 3] {
-    let stop_loss = current_price - STOP_LOSS_VALUE;
-    let take_profit = current_price + (current_price * TAKE_PROFIT_PERCENTAGE);
-
-    [current_price, stop_loss, take_profit]
-}
-
-fn sell(current_price: f64) -> [f64; 3] {
-    let stop_loss = current_price + STOP_LOSS_VALUE;
-    let take_profit = current_price - (current_price * TAKE_PROFIT_PERCENTAGE);
-
-    [current_price, stop_loss, take_profit]
 }

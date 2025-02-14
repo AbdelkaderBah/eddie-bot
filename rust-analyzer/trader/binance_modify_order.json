@@ -1,0 +1,30 @@
+{
+  "code": "000000",
+  "message": null,
+  "messageDetail": null,
+  "data": {
+    "symbol": "BTCUSDT",
+    "orderId": 4087432936,
+    "clientOrderId": "web_iG3OD7ekw3n6dETposjA",
+    "price": "0.00",
+    "avgPrice": "0",
+    "origQty": "0.002",
+    "executedQty": "0.000",
+    "cumQty": "0.000",
+    "status": "NEW",
+    "timeInForce": "GTE_GTC",
+    "type": "STOP_MARKET",
+    "side": "SELL",
+    "positionSide": "BOTH",
+    "updateTime": 1739569756955,
+    "rejectReason": null,
+    "priceRate": null,
+    "activatePrice": null,
+    "priceProtect": true,
+    "goodTillDate": 0,
+    "reduceOnly": true,
+    "cumQuote": "0.00000",
+    "selfProtectionMode": "EXPIRE_MAKER"
+  },
+  "success": true
+}

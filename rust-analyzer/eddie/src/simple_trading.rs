@@ -1,3 +1,4 @@
+use chrono::Utc;
 use redis::Commands;
 
 pub struct SimpleTrading {
@@ -12,6 +13,9 @@ pub struct SimpleTrading {
     pub losses: f64,
     pub trade_active: bool,
     pub redis: redis::Client,
+    pub take_profit_percentage: f64,
+    pub stop_loss_value_usd: f64,
+    pub watch_movement_percentage: f64,
 }
 
 const TAKE_PROFIT_PERCENTAGE: f64 = 0.03 / 100.0;
@@ -21,6 +25,9 @@ const WATCH_MOVEMENT_PERCENTAGE: f64 = 0.04;
 impl SimpleTrading {
     pub fn new(symbol: String, price: f64) -> Self {
         Self {
+            take_profit_percentage: 0.03 / 100.0,
+            stop_loss_value_usd: 5.0,
+            watch_movement_percentage: 0.04,
             redis: redis::Client::open("redis://127.0.01:6179").unwrap(),
             symbol,
             watch_price: price,
@@ -61,7 +68,12 @@ impl SimpleTrading {
                 if price_diff_percentage > 0.0 {
                     let [p, s, t] = Self::buy(price);
 
-                    let _ : () = self.redis.get_connection().unwrap().publish("buy", "do it please!").unwrap();
+                    let _: () = self
+                        .redis
+                        .get_connection()
+                        .unwrap()
+                        .publish("buy", "do it please!")
+                        .unwrap();
 
                     self.buy_price = p;
                     self.stop_loss = s;
@@ -74,7 +86,12 @@ impl SimpleTrading {
                 } else {
                     let [p, s, t] = Self::sell(price);
 
-                    let _ : () = self.redis.get_connection().unwrap().publish("sell", "do it please!").unwrap();
+                    let _: () = self
+                        .redis
+                        .get_connection()
+                        .unwrap()
+                        .publish("sell", "do it please!")
+                        .unwrap();
 
                     self.sell_price = p;
                     self.stop_loss = s;
@@ -92,7 +109,11 @@ impl SimpleTrading {
         if self.buy_price != 0.0 {
             if self.trade_active == false {
                 self.trade_active = true;
-                // self.buy_price = price;
+                self.buy_price = price;
+
+                let [current_price, stop_loss, take_profit] = Self::buy(price);
+                self.stop_loss = stop_loss;
+                self.take_profit = take_profit;
             }
 
             if price >= self.take_profit {
@@ -103,8 +124,9 @@ impl SimpleTrading {
                 self.reset();
             } else if price <= self.stop_loss {
                 println!("Stop loss hit: {}, {}", price, self.stop_loss);
-                println!("We have lost: {:.3}$", price - self.buy_price);
-                self.losses -= price - self.buy_price;
+                println!("We have lost: {:.3}$", f64::max(price - self.buy_price, -5.0));
+
+                self.losses -= f64::max(price - self.buy_price, -5.0);
 
                 self.reset();
             }
@@ -114,7 +136,11 @@ impl SimpleTrading {
         if self.sell_price != 0.0 {
             if self.trade_active == false {
                 self.trade_active = true;
-                // self.sell_price = price;
+                self.sell_price = price;
+
+                let [current_price, stop_loss, take_profit] = Self::sell(price);
+                self.stop_loss = stop_loss;
+                self.take_profit = take_profit;
             }
 
             if price <= self.take_profit {
@@ -125,9 +151,9 @@ impl SimpleTrading {
                 self.reset();
             } else if price >= self.stop_loss {
                 println!("Stop loss hit: {}, {}", price, self.stop_loss);
-                println!("We have lost: {:.3}$", self.sell_price - price);
+                println!("We have lost: {:.3}$", f64::max(self.sell_price - price, -5.0));
 
-                self.losses -= self.sell_price - price;
+                self.losses -= f64::max(self.sell_price - price, -5.0);
 
                 self.reset();
             }
@@ -145,6 +171,23 @@ impl SimpleTrading {
                 self.watch_price - diff,
                 diff,
             );
+
+            let score = Utc::now().timestamp();
+
+            let _: () = self
+                .redis
+                .get_connection()
+                .unwrap()
+                .zadd(
+                    "trades:debile",
+                    format!(
+                        "Total Profits: {:.3}, Total Losses {:.3}",
+                        self.profits, self.losses
+                    ),
+                    score,
+                )
+                .unwrap();
+
             println!(
                 "Total Profits: {:.3}, Total Losses {:.3}",
                 self.profits, self.losses
@@ -154,7 +197,7 @@ impl SimpleTrading {
         self.last_price = price;
     }
 
-    fn buy(current_price: f64) -> [f64; 3] {
+    fn buy(&self, current_price: f64) -> [f64; 3] {
         let stop_loss = current_price - STOP_LOSS_VALUE_USD;
         let take_profit = current_price * (1.0 + (TAKE_PROFIT_PERCENTAGE));
 

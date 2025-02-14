@@ -1,0 +1,8 @@
+[package]
+name = "trader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+binance = "0.21.0"
+redis = { version = "0.28.2", features = ["async-std-comp", "tokio-comp"] }

@@ -74,11 +74,11 @@ impl SimpleTrading {
                     self.stop_loss = s;
                     self.take_profit = t;
 
-                    println!(
-                        "{}, BUY TIME!! {}, {}%, SL: {}, TP: {}",
-                        self.symbol,
-                        &price, price_diff_percentage, self.stop_loss, self.take_profit
-                    );
+                    // println!(
+                    //     "{}, BUY TIME!! {}, {}%, SL: {}, TP: {}",
+                    //     self.symbol,
+                    //     &price, price_diff_percentage, self.stop_loss, self.take_profit
+                    // );
                 } else {
                     let [p, s, t] = self.sell(price);
 
@@ -86,11 +86,11 @@ impl SimpleTrading {
                     self.stop_loss = s;
                     self.take_profit = t;
 
-                    println!(
-                        "{}, SELL TIME!! {}, {}%, SL: {}, TP: {}",
-                        self.symbol,
-                        &price, price_diff_percentage, self.stop_loss, self.take_profit
-                    );
+                    // println!(
+                    //     "{}, SELL TIME!! {}, {}%, SL: {}, TP: {}",
+                    //     self.symbol,
+                    //     &price, price_diff_percentage, self.stop_loss, self.take_profit
+                    // );
                 }
             }
         }
@@ -107,18 +107,18 @@ impl SimpleTrading {
             }
 
             if price >= self.take_profit {
-                println!("{}, Take profit hit: {}, {}", self.symbol, price, self.take_profit);
-                println!("{}, We have made: {:.3}$", self.symbol, price - self.buy_price);
+                // println!("{}, Take profit hit: {}, {}", self.symbol, price, self.take_profit);
+                // println!("{}, We have made: {:.3}$", self.symbol, price - self.buy_price);
                 self.profits += price - self.buy_price;
 
                 self.reset();
             } else if price <= self.stop_loss {
-                println!("{}, Stop loss hit: {}, {}", self.symbol, price, self.stop_loss);
-                println!(
-                    "{}, We have lost: {:.3}$",
-                    self.symbol,
-                    f64::max(price - self.buy_price, -self.stop_loss_value_usd)
-                );
+                // println!("{}, Stop loss hit: {}, {}", self.symbol, price, self.stop_loss);
+                // println!(
+                //     "{}, We have lost: {:.3}$",
+                //     self.symbol,
+                //     f64::max(price - self.buy_price, -self.stop_loss_value_usd)
+                // );
 
                 self.losses -= f64::max(price - self.buy_price, -self.stop_loss_value_usd);
 
@@ -138,18 +138,18 @@ impl SimpleTrading {
             }
 
             if price <= self.take_profit {
-                println!("{}, Take profit hit: {}, {}", self.symbol, price, self.take_profit);
-                println!("{}, We have made: {:.3}$", self.symbol, self.sell_price - price);
+                // println!("{}, Take profit hit: {}, {}", self.symbol, price, self.take_profit);
+                // println!("{}, We have made: {:.3}$", self.symbol, self.sell_price - price);
                 self.profits += self.sell_price - price;
 
                 self.reset();
             } else if price >= self.stop_loss {
-                println!("{}, Stop loss hit: {}, {}", self.symbol, price, self.stop_loss);
-                println!(
-                    "{}, We have lost: {:.3}$",
-                    self.symbol,
-                    f64::max(self.sell_price - price, -self.stop_loss_value_usd)
-                );
+                // println!("{}, Stop loss hit: {}, {}", self.symbol, price, self.stop_loss);
+                // println!(
+                //     "{}, We have lost: {:.3}$",
+                //     self.symbol,
+                //     f64::max(self.sell_price - price, -self.stop_loss_value_usd)
+                // );
 
                 self.losses -= f64::max(self.sell_price - price, -self.stop_loss_value_usd);
 
@@ -162,14 +162,14 @@ impl SimpleTrading {
 
             let diff = self.watch_price * (self.watch_movement_percentage / 100.0);
 
-            println!(
-                "{}, Setting watch price: {}, BUY @ {:.3}, SELL @ {:.3}, DIFF in $ {:.1}",
-                self.symbol,
-                self.watch_price,
-                self.watch_price + diff,
-                self.watch_price - diff,
-                diff,
-            );
+            // println!(
+            //     "{}, Setting watch price: {}, BUY @ {:.3}, SELL @ {:.3}, DIFF in $ {:.1}",
+            //     self.symbol,
+            //     self.watch_price,
+            //     self.watch_price + diff,
+            //     self.watch_price - diff,
+            //     diff,
+            // );
 
             let score = Utc::now().timestamp();
 
@@ -187,11 +187,11 @@ impl SimpleTrading {
                 )
                 .unwrap();
 
-            println!(
-                "{}, Total Profits: {:.3}, Total Losses {:.3}",
-                self.symbol,
-                self.profits, self.losses
-            );
+            // println!(
+            //     "{}, Total Profits: {:.3}, Total Losses {:.3}",
+            //     self.symbol,
+            //     self.profits, self.losses
+            // );
         }
 
         self.last_price = price;
@@ -201,11 +201,11 @@ impl SimpleTrading {
         let stop_loss = current_price - self.stop_loss_value_usd;
         let take_profit = current_price * (1.0 + (self.take_profit_percentage));
 
-        println!(
-            "{}, Setting up Buy: {}, SL: {}, TP:{}",
-            self.symbol,
-            current_price, stop_loss, take_profit
-        );
+        // println!(
+        //     "{}, Setting up Buy: {}, SL: {}, TP:{}",
+        //     self.symbol,
+        //     current_price, stop_loss, take_profit
+        // );
 
         [current_price, stop_loss, take_profit]
     }
@@ -214,11 +214,11 @@ impl SimpleTrading {
         let stop_loss = current_price + self.stop_loss_value_usd;
         let take_profit = current_price * (1.0 - self.take_profit_percentage);
 
-        println!(
-            "{}, Setting up Sell: PRICE: {}, SL: {}, TP: {}",
-            self.symbol,
-            current_price, stop_loss, take_profit
-        );
+        // println!(
+        //     "{}, Setting up Sell: PRICE: {}, SL: {}, TP: {}",
+        //     self.symbol,
+        //     current_price, stop_loss, take_profit
+        // );
 
         [current_price, stop_loss, take_profit]
     }

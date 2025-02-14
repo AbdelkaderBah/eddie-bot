@@ -8,9 +8,11 @@ use tokio;
 use tokio::task;
 use tokio::time::{self, Duration};
 
+mod definitions;
 mod indicators;
 mod ml_knn_wo_learning;
 mod strategy_builder;
+
 use indicators::Indicators;
 
 const SYMBOLS: [&str; 3] = ["BTCUSDT", "ETHUSDT", "ETHBTC"];
@@ -41,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         tokio::time::sleep(Duration::from_secs(30)).await;
 
-         // let mut conn = client.get_connection().unwrap();
+        // let mut conn = client.get_connection().unwrap();
         // let value: String = conn.hget("strategies", "scalping_low_risk").unwrap();
         //
         // let builder = StrategyBuilder::new(
@@ -96,7 +98,7 @@ fn setup_binance() {
         let keep_running = AtomicBool::new(true); // Used to control the event loop
         let mut callback: Callbacks = Callbacks::new();
 
-        let mut market_redis: Client = Client::open("redis://127.0.0.1:6179").unwrap();;
+        let mut market_redis: Client = Client::open("redis://127.0.0.1:6179").unwrap();
 
         let mut web_socket = WebSockets::new(|event: WebsocketEvent| {
             match event {
@@ -110,7 +112,7 @@ fn setup_binance() {
         });
 
         web_socket.connect_multiple_streams(&endpoints()).unwrap(); // check error
-        // web_socket.connect(&depth).unwrap(); // check error
+                                                                    // web_socket.connect(&depth).unwrap(); // check error
 
         if let Err(e) = web_socket.event_loop(&keep_running) {
             match e {

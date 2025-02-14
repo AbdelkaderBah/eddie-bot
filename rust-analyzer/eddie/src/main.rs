@@ -44,6 +44,7 @@ fn setup_binance() {
     let mut simple_trading_v7 = simple_trading::SimpleTrading::new("BTCUSDT:V5".to_string(), 0.0, 0.07 / 100.0, 25.0, 0.07);
     let mut simple_trading_v8 = simple_trading::SimpleTrading::new("BTCUSDT:V6".to_string(), 0.0, 0.02 / 100.0, 0.0, 0.04);
     let mut simple_trading_v9 = simple_trading::SimpleTrading::new("BTCUSDT:V7".to_string(), 0.0, 0.02 / 100.0, 0.0, 0.08);
+    let mut simple_trading_v10 = simple_trading::SimpleTrading::new("BTCUSDT:V8".to_string(), 0.0, 0.035 / 100.0, 10.0, 0.08);
 
     let mut web_socket = WebSockets::new(|event: WebsocketEvent| {
         match event {
@@ -57,6 +58,7 @@ fn setup_binance() {
                 simple_trading_v7.run(event.kline.close.parse::<f64>().unwrap());
                 simple_trading_v8.run(event.kline.close.parse::<f64>().unwrap());
                 simple_trading_v9.run(event.kline.close.parse::<f64>().unwrap());
+                simple_trading_v10.run(event.kline.close.parse::<f64>().unwrap());
             }
             _ => {
                 println!("Received event: {:?}", event);

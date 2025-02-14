@@ -14,6 +14,9 @@ chmod +x deploy.sh
 
 ## Helpful commands
 
+```bash
+ docker exec c05b70a10248 sh -c "redis-cli --csv hgetall trades:debile"
+```
 
 
 ```bash

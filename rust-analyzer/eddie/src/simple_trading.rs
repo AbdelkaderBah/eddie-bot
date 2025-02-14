@@ -187,6 +187,21 @@ impl SimpleTrading {
                 )
                 .unwrap();
 
+            let _: () = self
+                .redis
+                .get_connection()
+                .unwrap()
+                .zadd(
+                    format!("trades:debile:{}", self.symbol.to_string()),
+                    format!(
+                        "Total Profits: {:.3}, Total Losses {:.3}, Timestamp: {}",
+                        self.profits, self.losses,
+                        score,
+                    ),
+                    score
+                )
+                .unwrap();
+
             // println!(
             //     "{}, Total Profits: {:.3}, Total Losses {:.3}",
             //     self.symbol,

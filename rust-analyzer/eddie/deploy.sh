@@ -30,6 +30,6 @@ cp target/release/eddie /usr/local/bin/eddie
 echo "Restarting application via Supervisor..."
 sudo supervisorctl reread
 sudo supervisorctl update
-sudo supervisorctl restart eddie
+sudo supervisorctl start eddie
 
-echo "Deployment complete!"
+echo "VHAKM en place!"

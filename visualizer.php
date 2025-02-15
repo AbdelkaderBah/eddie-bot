@@ -16,7 +16,7 @@ try {
 function getSortedTradeTableHTML($redis, $hash_key) {
     $hash_data_raw = $redis->hGetAll($hash_key);
     if (empty($hash_data_raw)) {
-        return ["html" => "<p>No data in hash '$hash_key' or hash does not exist.</p>", "stats" => []];
+        return ["html" => "<p class='no-data'>No data available in hash '$hash_key'</p>", "stats" => []];
     }
     ksort($hash_data_raw); // Sort keys alphabetically
 
@@ -27,6 +27,7 @@ function getSortedTradeTableHTML($redis, $hash_key) {
         $losses = floatval(str_replace('Total Losses ', '', $losses));
 
         $hash_data_processed[$key] = [
+            'name' => $key,
             'value_string' => $value_string,
             'profits' => $profits,
             'losses' => $losses,
@@ -36,41 +37,39 @@ function getSortedTradeTableHTML($redis, $hash_key) {
 
     // Calculate Stats
     $best_profit_key = null;
-    $best_profit_value = -INF;
+    $best_profit_value = 0;
     $worst_loss_key = null;
-    $worst_loss_value = INF;
+    $worst_loss_value = 0;
 
     foreach ($hash_data_processed as $key => $data) {
         if ($data['total_result'] > $best_profit_value) {
             $best_profit_value = $data['total_result'];
             $best_profit_key = $key;
         }
-        if ($data['total_result'] < $worst_loss_value) { // Actually, we want largest LOSS, not worst RESULT
-            $worst_loss_value = $data['total_result']; // Store total result for comparison, but...
+
+        if ($worst_loss_value > $data['total_result']) { // Find key with maximum loss
+            $worst_loss_value = $data['total_result'];
             $worst_loss_key = $key;
         }
     }
-    // For "worst loss", we actually want the key with the *highest* loss value, independently of profit
-    $max_loss_key = null;
-    $max_loss_amount = 0;
-    foreach ($hash_data_processed as $key => $data) {
-        if ($data['losses'] > $max_loss_amount) {
-            $max_loss_amount = $data['losses'];
-            $max_loss_key = $key;
-        }
-    }
+
+    // Sort descending by total result
+    usort($hash_data_processed, function ($a, $b) {
+        return $b['total_result'] <=> $a['total_result'];
+    });
 
 
-    $html_table = "<table border='1' class='trade-table' id='tradeDataTable'>";
-    $html_table .= "<thead><tr>";
-    $html_table .= "<th onclick='sortTable(0)'>Name</th>"; // Make header sortable by key (column index 0)
-    $html_table .= "<th onclick='sortTable(1)'>Profit</th>"; // Make header sortable by value (column index 1)
-    $html_table .= "<th onclick='sortTable(2)'>Loss</th>"; // Make header sortable by value (column index 1)
+    $html_table = "<table class='trade-table' id='tradeDataTable'>";
+    $html_table .= "<thead class='table-header'><tr>";
+    $html_table .= "<th onclick='sortTable(0)'>Name</th>";
+    $html_table .= "<th onclick='sortTable(1)'>Net profits</th>";
+    $html_table .= "<th onclick='sortTable(2)'>Profit</th>";
+    $html_table .= "<th onclick='sortTable(3)'>Loss</th>";
     $html_table .= "</tr></thead>";
     $html_table .= "<tbody>";
 
     foreach ($hash_data_processed as $key => $data) {
-        $html_table .= "<tr><td>" . htmlspecialchars($key) . "</td><td>" . htmlspecialchars($data['profits']) . "</td><td>" . htmlspecialchars($data['losses']) . "</td></tr>";
+        $html_table .= "<tr><td>" . htmlspecialchars($data['name']) . "</td><td>" . htmlspecialchars(number_format($data['total_result'], 3)) . "</td><td>" . htmlspecialchars(number_format($data['profits'], 3)) . "</td><td>" . htmlspecialchars(number_format($data['losses'], 3)) . "</td></tr>";
     }
 
     $html_table .= "</tbody></table>";
@@ -78,8 +77,8 @@ function getSortedTradeTableHTML($redis, $hash_key) {
     $stats = [
         'best_profit_key' => $best_profit_key,
         'best_profit_value' => number_format($best_profit_value, 2),
-        'worst_loss_key' => $worst_loss_key, // Using max_loss_key for "worst loss"
-        'worst_loss_value' => number_format($max_loss_amount, 2), // Display max loss amount
+        'worst_loss_key' => $worst_loss_key,
+        'worst_loss_value' => number_format($worst_loss_value, 2),
     ];
 
 
@@ -105,73 +104,138 @@ $redis->close();
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Trades:debile Data</title>
+    <title>VHAKM Trades Data</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f7f9; color: #333; margin: 20px; }
-        h1 { color: #4285f4; text-align: center; margin-bottom: 20px; }
+        #tradeTableContainer {
+            width: 90%;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: black;
+            text-align: center;
+            margin-bottom: 30px;
+            font-weight: 700;
+            font-size: 50px;
+            letter-spacing: 0.5px;
+        }
 
         .stats-container {
             display: flex;
             justify-content: center;
-            gap: 20px;
-            margin-bottom: 20px;
+            gap: 30px;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 1200px;
         }
 
         .stats-card {
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+            padding: 30px;
             text-align: center;
-            width: 250px;
+            flex: 1;
+            min-width: 200px;
+            transition: transform 0.2s ease-in-out;
+            border: 1px solid #e9ecef;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
         }
 
         .stats-card h3 {
-            color: #2e7d32; /* Green for profit, adjust color as needed */
+            color: #1e8e3e; /* Profit color - vibrant green */
             margin-top: 0;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            font-size: 1.5em;
         }
 
         .stats-card.loss h3 {
-            color: #d32f2f; /* Red for loss, adjust color as needed */
+            color: #dc3545; /* Loss color - strong red */
         }
 
         .stats-card p {
-            font-size: 1.2em;
+            font-size: 2em;
             font-weight: bold;
-            color: #555;
+            color: #495057;
             margin: 0;
+            line-height: 1.2;
         }
-
 
         .trade-table {
-            width: 95%; /* Wider table */
+            width: 100%;
+            max-width: 1200px;
             border-collapse: collapse;
-            margin: 20px auto; /* Centered table */
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15); /* Stronger shadow */
-            background-color: #fff; /* White table background */
+            margin-bottom: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-radius: 12px 12px 0 0;
+            overflow: hidden; /* For rounded corners on header */
         }
-        .trade-table th, .trade-table td {
-            border: 1px solid #ddd;
-            padding: 12px; /* More padding in cells */
+
+        .table-header th {
+            background-color: #007bff; /* Bootstrap primary blue */
+            color: white;
+            font-weight: 500;
             text-align: left;
-            font-size: 0.95em; /* Slightly larger font */
+            padding: 18px 20px;
+            border-bottom: 2px solid #0056b3;
+            cursor: pointer;
+            user-select: none; /* Prevent text selection during click */
         }
-        .trade-table th {
-            background-color: #4285f4; /* Primary blue header color */
-            color: white; /* White header text */
-            font-weight: bold;
-            cursor: pointer; /* Indicate sortable */
-        }
+
+        .trade-table th:first-child { border-top-left-radius: 12px; }
+        .trade-table th:last-child { border-top-right-radius: 12px; }
+
         .trade-table th:hover {
-            background-color: #3b78e7; /* Slightly darker on hover */
+            background-color: #0056b3;
         }
+
+        .trade-table td {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 0.9rem;
+        }
+
+        .trade-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
         .trade-table tbody tr:nth-child(even) {
-            background-color: #f2f2f2; /* Light grey for even rows */
+            background-color: #f8f9fa;
         }
+
         .trade-table tbody tr:hover {
-            background-color: #e6e6e6; /* Slightly darker on row hover */
+            background-color: #e0f7fa; /* Light teal hover for rows */
+            transition: background-color 0.3s ease;
         }
+
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #6c757d;
+        }
+
+        .sorted-column {
+            background-color: #0056b3 !important; /* Keep hover color or slightly darker when sorted */
+            color: white !important;
+        }
+
     </style>
     <script>
 
@@ -182,7 +246,7 @@ $redis->close();
                     document.getElementById('tradeTableContainer').innerHTML = html;
                     // Re-apply sorting if any column was sorted before refresh
                     if (currentSortColumn !== -1) {
-                        sortTable(currentSortColumn); // Re-sort after update
+                        // sortTable(currentSortColumn); // Re-sort after update
                     }
                     updateStatsCards(); // Update stats cards on refresh
                 })
@@ -200,37 +264,16 @@ $redis->close();
                     tempTableContainer.innerHTML = html;
                     const tableBody = tempTableContainer.querySelector('#tradeDataTable tbody');
                     if (tableBody) {
-                        let bestProfitKey = null;
-                        let bestProfitValue = 0;
-                        let worstLossKey = null;
-                        let worstLossValue = 0;
-
-                        const rows = tableBody.querySelectorAll('tr');
-                        rows.forEach(row => {
-                            const key = row.cells[0].textContent;
-                            const profits = parseFloat(row.cells[1].textContent);
-                            const losses = parseFloat(row.cells[2].textContent);
-
-                            const totalResult = profits - losses;
-
-                            if (totalResult > bestProfitValue) {
-                                bestProfitValue = totalResult;
-                                bestProfitKey = key;
-                            }
-
-                            if (losses > worstLossValue) { // Find key with maximum loss
-                                worstLossValue = losses;
-                                worstLossKey = key;
-                            }
-                        });
+                        let bestProfitKey = document.getElementById('bestProfitKey').textContent;
+                        let bestProfitValue = document.getElementById('bestProfitValue').textContent;
+                        let worstLossKey = document.getElementById('worstLossKey').textContent;
+                        let worstLossValue = document.getElementById('worstLossValue').textContent;
 
                         document.getElementById('bestProfitKey').textContent = bestProfitKey || 'N/A';
                         document.getElementById('bestProfitValue').textContent = bestProfitValue !== -Infinity ? bestProfitValue.toFixed(2) : 'N/A';
                         document.getElementById('worstLossKey').textContent = worstLossKey || 'N/A';
                         document.getElementById('worstLossValue').textContent = worstLossValue !== Infinity ? worstLossValue.toFixed(2) : 'N/A';
                     }
-
-                    sortTable(2);
                 })
                 .catch(error => {
                     console.error('Error updating stats:', error);
@@ -241,15 +284,14 @@ $redis->close();
         document.addEventListener('DOMContentLoaded', function() {
             setInterval(refreshTradeTable, 15000); // Refresh every 15 seconds
             updateStatsCards(); // Initial stats update on page load
-
-            sortTable(2);
         });
 
 
-        let currentSortColumn = -1; // Track currently sorted column (-1: no sorting)
-        let isAscendingSort = true;
+        let currentSortColumn = 1; // Track currently sorted column (-1: no sorting)
+        let isAscendingSort = false;
 
         function sortTable(columnIndex) {
+            return;
             const table = document.getElementById('tradeDataTable');
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -262,13 +304,20 @@ $redis->close();
             }
 
             const sortedRows = rows.sort((rowA, rowB) => {
-                const cellA = rowA.cells[columnIndex].textContent.trim().toUpperCase();
-                const cellB = rowB.cells[columnIndex].textContent.trim().toUpperCase();
+                let cellA, cellB;
+                if (columnIndex === 1 || columnIndex === 2) { // For Profit and Loss columns, sort numerically
+                    cellA = parseFloat(rowA.cells[3].textContent.trim());
+                    cellB = parseFloat(rowB.cells[2].textContent.trim());
+                } else { // For Name column (columnIndex === 0), sort alphabetically
+                    cellA = rowA.cells[3].textContent.trim().toUpperCase();
+                    cellB = rowB.cells[2].textContent.trim().toUpperCase();
+                }
+
 
                 let comparison = 0;
                 if (cellA > cellB) {
                     comparison = 1;
-                } else if (cellA < cellB) {
+                } else if (cellB > cellA) {
                     comparison = -1;
                 }
                 return isAscendingSort ? comparison : comparison * -1; // Apply sort direction
@@ -276,24 +325,39 @@ $redis->close();
 
             tbody.innerHTML = ''; // Clear table body
             sortedRows.forEach(row => tbody.appendChild(row)); // Append sorted rows
+
+            //Highlight the sorted column header
+            highlightSortColumn(columnIndex);
         }
+
+        function highlightSortColumn(columnIndex) {
+            const headers = document.querySelectorAll('#tradeDataTable th');
+            headers.forEach((header, index) => {
+                if (index === columnIndex) {
+                    header.classList.add('sorted-column'); // Add class to highlight
+                } else {
+                    header.classList.remove('sorted-column'); // Remove from others
+                }
+            });
+        }
+
 
     </script>
 </head>
 <body>
-<h1>VHAKM Hash Data</h1>
+<h1>VHAKM Trades Data</h1>
 
 <div class="stats-container">
     <div class="stats-card">
-        <h3>Best BOT By Profit</h3>
+        <h3>Best performing bot</h3>
         <p id="bestProfitKey"><?php echo htmlspecialchars($initial_stats['best_profit_key'] ?? 'N/A'); ?></p>
-        <p>Profit: <span id="bestProfitValue"><?php echo htmlspecialchars($initial_stats['best_profit_value'] ?? 'N/A'); ?></span></p>
+        <p><span id="bestProfitValue"><?php echo htmlspecialchars($initial_stats['best_profit_value'] ?? 'N/A'); ?></span></p>
     </div>
 
     <div class="stats-card loss">
-        <h3>Worst BOT By Loss</h3>
+        <h3>Worst performing bot</h3>
         <p id="worstLossKey"><?php echo htmlspecialchars($initial_stats['worst_loss_key'] ?? 'N/A'); ?></p>
-        <p>Loss: <span id="worstLossValue"><?php echo htmlspecialchars($initial_stats['worst_loss_value'] ?? 'N/A'); ?></span></p>
+        <p><span id="worstLossValue"><?php echo htmlspecialchars($initial_stats['worst_loss_value'] ?? 'N/A'); ?></span></p>
     </div>
 </div>
 

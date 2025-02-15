@@ -9,6 +9,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let secret_key =
         Some("5c3e116b5e49ada0ef08aa56334c9e1f46b739bc9d669f1ba3c1ea52ca30f31f".into());
 
+
+    // @todo: get prices from binance TESTNET futures for the websocket on eddie (the other project).
+
+
     let config = Config::default()
         .set_rest_api_endpoint("https://testnet.binancefuture.com")
         .set_futures_rest_api_endpoint("https://testnet.binancefuture.com");
